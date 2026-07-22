@@ -1,0 +1,35 @@
+import { Module } from '@nestjs/common';
+import { IntegrationController } from './presentation/integration.controller';
+import { IntegrationsController } from './presentation/integrations.controller';
+
+import { INTEGRATION_COMMAND_HANDLERS } from './application/commands';
+import { INTEGRATION_QUERY_HANDLERS } from './application/queries';
+import { CREDENTIAL_VAULT } from './application/ports/credential-vault.port';
+import { INTEGRATION_CONNECTORS } from './application/ports/integration-connector.port';
+import { INTEGRATION_CONNECTION_REPOSITORY } from './domain/repositories/integration-connection.repository.interface';
+
+import { AesCredentialVaultService } from './infrastructure/services/aes-credential-vault.service';
+import { JiraConnectorService } from './infrastructure/connectors/jira-connector.service';
+import { PrismaIntegrationConnectionRepository } from './infrastructure/repositories/prisma-integration-connection.repository';
+
+// Bounded context module: Integration Hub (Solution Architecture §6/§18).
+// Layering: presentation -> application -> domain <- infrastructure (Solution Architecture §7).
+// Jira is the reference connector implementation; Linear and others register the same way --
+// implement IIntegrationConnector, add to the INTEGRATION_CONNECTORS factory below.
+@Module({
+  controllers: [IntegrationController, IntegrationsController],
+  providers: [
+    ...INTEGRATION_COMMAND_HANDLERS,
+    ...INTEGRATION_QUERY_HANDLERS,
+    JiraConnectorService,
+    { provide: CREDENTIAL_VAULT, useClass: AesCredentialVaultService },
+    { provide: INTEGRATION_CONNECTION_REPOSITORY, useClass: PrismaIntegrationConnectionRepository },
+    {
+      provide: INTEGRATION_CONNECTORS,
+      useFactory: (jira: JiraConnectorService) => [jira],
+      inject: [JiraConnectorService],
+    },
+  ],
+  exports: [],
+})
+export class IntegrationModule {}

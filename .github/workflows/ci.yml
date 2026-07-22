@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://sprintguard:sprintguard@localhost:5432/sprintguard?schema=public
+  REDIS_URL: redis://localhost:6379
+  JWT_ACCESS_SECRET: ci-access-secret-not-for-production-use
+  JWT_REFRESH_SECRET: ci-refresh-secret-not-for-production-use
+  CREDENTIAL_ENCRYPTION_KEY: ci-credential-vault-key-not-for-production
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: sprintguard
+          POSTGRES_PASSWORD: sprintguard
+          POSTGRES_DB: sprintguard
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sprintguard -d sprintguard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @sprintguard/database exec prisma generate
+
+      - name: Apply migrations against a fresh database
+        run: pnpm --filter @sprintguard/database exec prisma migrate deploy
+
+      - name: Seed RBAC/connector/agent/prompt catalog
+        run: pnpm --filter @sprintguard/database exec prisma db seed
+
+      - name: Typecheck (all packages/apps)
+        run: pnpm turbo run typecheck
+
+      - name: Lint (all packages/apps)
+        run: pnpm turbo run lint
+
+      - name: Unit tests (apps/api)
+        run: pnpm --filter @sprintguard/api test -- --ci --coverage
+
+      - name: E2E tests (apps/api — mocked persistence, real HTTP/guard/CQRS pipeline)
+        run: pnpm --filter @sprintguard/api test:e2e
+
+      - name: Component/store/schema tests (apps/web)
+        run: pnpm --filter @sprintguard/web test
+
+      - name: Build (all packages/apps)
+        run: pnpm turbo run build

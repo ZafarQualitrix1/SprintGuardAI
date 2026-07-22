@@ -1,0 +1,1290 @@
+// SprintGuard AI — Database Schema
+// Implements docs/architecture/02-database-design.md
+// Row-Level Security policies are applied separately via prisma/sql/rls_policies.sql
+// (Prisma does not manage RLS or vector indexes natively).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector"), uuidOssp(map: "uuid-ossp")]
+}
+
+// ============================================================================
+// Identity & Tenancy
+// ============================================================================
+
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships          Membership[]
+  apiKeys              ApiKey[]
+  projects             Project[]
+  agentRuns            AgentRun[]
+  aiUsageMetrics       AiUsageMetric[]
+  aiIncidents          AiIncident[]
+  knowledgeNodes       KnowledgeNode[]
+  documentAssets       DocumentAsset[]
+  integrationConnections IntegrationConnection[]
+  featureFlagOverrides FeatureFlagOverride[]
+  pluginInstallations  PluginInstallation[]
+  workflowDefinitions  WorkflowDefinition[]
+  subscriptions        Subscription[]
+  usageQuotas          UsageQuota[]
+  tenantBranding       TenantBranding?
+  auditLogs            AuditLog[]
+  notifications        NotificationEvent[]
+  organizationMemory   OrganizationMemory?
+
+  @@index([slug])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String?
+  fullName     String
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  memberships       Membership[]
+  refreshTokens     RefreshToken[]
+  promptApprovals   PromptApproval[]
+  auditLogs         AuditLog[] @relation("AuditActor")
+  notifications     NotificationEvent[]
+
+  @@index([email])
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  key       String   @unique // OWNER, ADMIN, PROJECT_ADMIN, QA_LEAD, QA_ENGINEER, PRODUCT_MANAGER, ENGINEER, VIEWER, PROMPT_APPROVER, PLATFORM_ADMIN
+  name      String
+  isSystem  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  memberships     Membership[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id   String @id @default(cuid())
+  key  String @unique // e.g. "sprint:read", "prompt:approve", "billing:manage"
+  description String
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  roleId         String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  keyPrefix      String
+  hashedKey      String    @unique
+  scopes         Json // string[]
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model RefreshToken {
+  id               String    @id @default(cuid())
+  userId           String
+  tokenHash        String    @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedByTokenId String?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============================================================================
+// Project & Sprint
+// ============================================================================
+
+model Project {
+  id             String    @id @default(cuid())
+  organizationId String
+  key            String
+  name           String
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sprints             Sprint[]
+  coverageMatrix      CoverageMatrixEntry[]
+  gaps                Gap[]
+  releaseReports      ReleaseReport[]
+  documentAssets      DocumentAsset[]
+  projectMemory       ProjectMemory?
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum SprintSource {
+  MANUAL
+  JIRA
+  AZURE_DEVOPS
+  GITHUB
+  LINEAR
+}
+
+model Sprint {
+  id         String       @id @default(cuid())
+  projectId  String
+  externalId String?
+  name       String
+  goal       String?
+  status     SprintStatus @default(PLANNED)
+  source     SprintSource @default(MANUAL)
+  startDate  DateTime?
+  endDate    DateTime?
+  rawImport  Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stories        Story[]
+  riskAssessments RiskAssessment[]
+  releaseReports ReleaseReport[]
+  coverageMatrix CoverageMatrixEntry[]
+  gaps           Gap[]
+  executions     Execution[]
+  sprintMemory   SprintMemory?
+
+  @@index([projectId])
+  @@index([projectId, status])
+}
+
+// ============================================================================
+// Requirement Intelligence
+// ============================================================================
+
+enum StoryStatus {
+  BACKLOG
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  BLOCKED
+}
+
+model Story {
+  id           String      @id @default(cuid())
+  sprintId     String
+  externalId   String?
+  title        String
+  description  String?
+  storyPoints  Int?
+  status       StoryStatus @default(BACKLOG)
+  priority     String?
+  assignee     String?
+  source       SprintSource @default(MANUAL)
+  raw          Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sprint          Sprint           @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  requirements    Requirement[]
+  dependenciesFrom Dependency[]    @relation("DependencyFrom")
+  dependenciesTo   Dependency[]    @relation("DependencyTo")
+  testScenarios   TestScenario[]
+  riskAssessments RiskAssessment[]
+  defects         Defect[]
+
+  @@index([sprintId])
+  @@index([sprintId, status])
+}
+
+enum RequirementType {
+  FUNCTIONAL
+  NON_FUNCTIONAL
+  BUSINESS_RULE
+  CONSTRAINT
+}
+
+model Requirement {
+  id              String          @id @default(cuid())
+  storyId         String
+  text            String
+  type            RequirementType @default(FUNCTIONAL)
+  confidenceScore Float?
+  extractedByAgentRunId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  story                Story                 @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  acceptanceCriteria   AcceptanceCriterion[]
+  coverageMatrixEntries CoverageMatrixEntry[]
+  gaps                 Gap[]
+
+  @@index([storyId])
+}
+
+model AcceptanceCriterion {
+  id            String   @id @default(cuid())
+  requirementId String
+  given         String
+  when          String
+  then          String
+  order         Int      @default(0)
+  source        String   @default("AI_GENERATED") // AI_GENERATED | MANUAL
+  createdAt     DateTime @default(now())
+
+  requirement   Requirement    @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  testScenarios TestScenario[]
+
+  @@index([requirementId])
+}
+
+enum DependencyType {
+  BLOCKS
+  RELATES_TO
+  DUPLICATES
+  SHARED_COMPONENT
+}
+
+model Dependency {
+  id              String         @id @default(cuid())
+  fromStoryId     String
+  toStoryId       String
+  type            DependencyType
+  confidenceScore Float?
+  detectedByAgentRunId String?
+  createdAt       DateTime       @default(now())
+
+  fromStory Story @relation("DependencyFrom", fields: [fromStoryId], references: [id], onDelete: Cascade)
+  toStory   Story @relation("DependencyTo", fields: [toStoryId], references: [id], onDelete: Cascade)
+
+  @@index([fromStoryId])
+  @@index([toStoryId])
+}
+
+// ============================================================================
+// Test Intelligence
+// ============================================================================
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model TestScenario {
+  id                    String   @id @default(cuid())
+  acceptanceCriterionId String
+  storyId               String
+  title                 String
+  description           String?
+  priority              Priority @default(MEDIUM)
+  tags                  Json? // string[]
+  generatedByAgentRunId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  acceptanceCriterion AcceptanceCriterion @relation(fields: [acceptanceCriterionId], references: [id], onDelete: Cascade)
+  story               Story               @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  testCases           TestCase[]
+
+  @@index([acceptanceCriterionId])
+  @@index([storyId])
+}
+
+enum AutomationStatus {
+  MANUAL
+  AUTOMATABLE
+  AUTOMATED
+}
+
+model TestCase {
+  id                    String            @id @default(cuid())
+  testScenarioId        String
+  title                 String
+  steps                 Json // { step: string, expected: string }[]
+  testData              Json?
+  priority              Priority          @default(MEDIUM)
+  automationStatus      AutomationStatus  @default(MANUAL)
+  generatedByAgentRunId String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  testScenario   TestScenario          @relation(fields: [testScenarioId], references: [id], onDelete: Cascade)
+  executions     Execution[]
+  coverageMatrix CoverageMatrixEntry[]
+  gaps           Gap[]
+
+  @@index([testScenarioId])
+}
+
+// ============================================================================
+// Coverage & Risk
+// ============================================================================
+
+enum CoverageStatus {
+  COVERED
+  PARTIALLY_COVERED
+  NOT_COVERED
+}
+
+model CoverageMatrixEntry {
+  id             String         @id @default(cuid())
+  projectId      String
+  sprintId       String
+  requirementId  String
+  testCaseId     String?
+  coverageStatus CoverageStatus @default(NOT_COVERED)
+  computedAt     DateTime       @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint      Sprint       @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  requirement Requirement  @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  testCase    TestCase?    @relation(fields: [testCaseId], references: [id])
+
+  @@index([projectId, sprintId])
+  @@index([requirementId])
+}
+
+enum GapSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Gap {
+  id            String      @id @default(cuid())
+  projectId     String
+  sprintId      String
+  requirementId String?
+  testCaseId    String?
+  gapType       String // MISSING_TEST | MISSING_AC | STALE_COVERAGE
+  severity      GapSeverity @default(MEDIUM)
+  description   String
+  resolvedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint      Sprint       @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  requirement Requirement? @relation(fields: [requirementId], references: [id])
+  testCase    TestCase?    @relation(fields: [testCaseId], references: [id])
+
+  @@index([projectId, sprintId])
+}
+
+model RiskAssessment {
+  id                    String   @id @default(cuid())
+  sprintId              String
+  storyId               String?
+  riskScore             Float
+  riskFactors           Json // structured factor breakdown
+  generatedByAgentRunId String?
+  createdAt             DateTime @default(now())
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  story  Story? @relation(fields: [storyId], references: [id])
+
+  @@index([sprintId])
+}
+
+// ============================================================================
+// Execution
+// ============================================================================
+
+enum ExecutionStatus {
+  NOT_RUN
+  PASSED
+  FAILED
+  BLOCKED
+  SKIPPED
+}
+
+model Execution {
+  id          String          @id @default(cuid())
+  testCaseId  String
+  sprintId    String
+  status      ExecutionStatus @default(NOT_RUN)
+  executedBy  String?
+  executedAt  DateTime?
+  notes       String?
+  evidenceUrl String?
+  createdAt   DateTime        @default(now())
+
+  testCase TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  sprint   Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  defects  Defect[]
+
+  @@index([testCaseId])
+  @@index([sprintId])
+}
+
+// ============================================================================
+// Release Governance
+// ============================================================================
+
+enum ReleaseReportStatus {
+  DRAFT
+  PENDING_APPROVAL
+  PUBLISHED
+}
+
+model ReleaseReport {
+  id                    String              @id @default(cuid())
+  projectId             String
+  sprintId              String
+  readinessScore        Float
+  executiveSummary      String?
+  breakdown             Json // per-dimension score breakdown
+  status                ReleaseReportStatus @default(DRAFT)
+  generatedByAgentRunId String?
+  createdAt             DateTime            @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sprint  Sprint  @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sprintId])
+}
+
+// ============================================================================
+// Defect Intelligence (Phase 2 — schema defined now)
+// ============================================================================
+
+enum DefectSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DefectStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
+}
+
+model Defect {
+  id          String         @id @default(cuid())
+  storyId     String?
+  executionId String?
+  externalId  String?
+  title       String
+  severity    DefectSeverity @default(MEDIUM)
+  status      DefectStatus   @default(OPEN)
+  source      SprintSource   @default(MANUAL)
+  createdAt   DateTime       @default(now())
+
+  story     Story?     @relation(fields: [storyId], references: [id])
+  execution Execution? @relation(fields: [executionId], references: [id])
+
+  @@index([storyId])
+}
+
+// ============================================================================
+// Agent Framework
+// ============================================================================
+
+enum AgentStatus {
+  REGISTERED
+  ENABLED
+  DEPRECATED
+  DISABLED
+}
+
+model Agent {
+  id          String      @id @default(cuid())
+  key         String      @unique // e.g. "sprint-analyst", "test-scenario-generator"
+  name        String
+  description String?
+  version     String
+  capabilities Json // string[] capability tags (Agent Capability Registry)
+  status      AgentStatus @default(REGISTERED)
+  isBuiltIn   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  runs         AgentRun[]
+  toolBindings AgentToolBinding[]
+  usageMetrics AiUsageMetric[]
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RETRYING
+  FLAGGED_FOR_REVIEW
+}
+
+model AgentRun {
+  id             String         @id @default(cuid())
+  agentId        String
+  organizationId String
+  correlationId  String
+  parentRunId    String?
+  status         AgentRunStatus @default(PENDING)
+  input          Json
+  output         Json?
+  confidenceScore Float?
+  provider       String?
+  model          String?
+  tokensUsed     Int?
+  costUsd        Decimal?       @db.Decimal(10, 6)
+  error          String?
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  agent        Agent          @relation(fields: [agentId], references: [id])
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     AgentMessage[]
+  aiResponses  AiResponse[]
+  decisionAudits AiDecisionAudit[]
+
+  @@index([organizationId, status])
+  @@index([correlationId])
+}
+
+model AgentMessage {
+  id         String   @id @default(cuid())
+  agentRunId String
+  fromAgent  String
+  toAgent    String
+  intent     String
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  agentRun AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([agentRunId])
+}
+
+model AgentTool {
+  id          String @id @default(cuid())
+  key         String @unique // e.g. "QueryKnowledgeGraphTool"
+  name        String
+  description String?
+  schema      Json // JSON Schema of tool input/output
+
+  bindings AgentToolBinding[]
+}
+
+model AgentToolBinding {
+  agentId String
+  toolId  String
+
+  agent Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  tool  AgentTool @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, toolId])
+}
+
+// ============================================================================
+// AI Orchestration / Governance
+// ============================================================================
+
+enum PromptStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ACTIVE
+  DEPRECATED
+}
+
+model AiPrompt {
+  id           String       @id @default(cuid())
+  capability   String // e.g. "test-scenario-generation"
+  version      String
+  template     String
+  jsonSchema   Json
+  model        String?
+  status       PromptStatus @default(DRAFT)
+  isActive     Boolean      @default(false)
+  templateHash String
+  createdBy    String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  approvals   PromptApproval[]
+  aiResponses AiResponse[]
+
+  @@unique([capability, version])
+  @@index([capability, isActive])
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+model PromptApproval {
+  id          String           @id @default(cuid())
+  promptId    String
+  reviewerId  String
+  decision    ApprovalDecision
+  rationale   String?
+  diffSummary String?
+  createdAt   DateTime         @default(now())
+
+  prompt   AiPrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  reviewer User     @relation(fields: [reviewerId], references: [id])
+
+  @@index([promptId])
+}
+
+model ModelRegistryEntry {
+  id                  String   @id @default(cuid())
+  provider            String // anthropic | openai | google
+  model               String
+  version             String?
+  allowedCapabilities Json // string[]
+  costTier            String // cheap | standard | reasoning
+  isActive            Boolean  @default(true)
+  orgAllowList        Json? // null = all orgs; else organizationId[]
+  createdAt           DateTime @default(now())
+
+  aiResponses AiResponse[]
+
+  @@unique([provider, model])
+}
+
+model GuardrailPolicy {
+  id        String   @id @default(cuid())
+  name      String
+  type      String // pii | content-safety | schema
+  config    Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AiResponse {
+  id                   String   @id @default(cuid())
+  agentRunId           String
+  promptId             String
+  modelRegistryEntryId String?
+  promptVersion        String
+  promptHash           String
+  rawResponse          Json
+  parsedResponse        Json
+  confidenceScore      Float
+  tokensUsed           Int?
+  costUsd              Decimal? @db.Decimal(10, 6)
+  latencyMs            Int?
+  createdAt            DateTime @default(now())
+
+  agentRun           AgentRun            @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  prompt             AiPrompt            @relation(fields: [promptId], references: [id])
+  modelRegistryEntry ModelRegistryEntry? @relation(fields: [modelRegistryEntryId], references: [id])
+  decisionAudits     AiDecisionAudit[]
+
+  @@index([agentRunId])
+  @@index([promptId])
+}
+
+model AiDecisionAudit {
+  id           String   @id @default(cuid())
+  agentRunId   String
+  aiResponseId String?
+  decisionType String // e.g. "human-approval", "guardrail-block", "rollback"
+  outcome      String
+  reviewerId   String?
+  rationale    String?
+  createdAt    DateTime @default(now())
+
+  agentRun   AgentRun    @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  aiResponse AiResponse? @relation(fields: [aiResponseId], references: [id])
+
+  @@index([agentRunId])
+}
+
+// ============================================================================
+// AI Operations
+// ============================================================================
+
+model AiUsageMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  agentId        String?
+  provider       String
+  model          String
+  date           DateTime @db.Date
+  tokensUsed     Int      @default(0)
+  costUsd        Decimal  @default(0) @db.Decimal(10, 6)
+  requestCount   Int      @default(0)
+  errorCount     Int      @default(0)
+  avgLatencyMs   Int?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent        Agent?       @relation(fields: [agentId], references: [id])
+
+  @@unique([organizationId, agentId, provider, model, date])
+  @@index([organizationId, date])
+}
+
+enum AiIncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model AiIncident {
+  id             String             @id @default(cuid())
+  organizationId String
+  agentId        String?
+  type           String // hallucination | provider-outage | guardrail-violation
+  severity       AiIncidentSeverity @default(MEDIUM)
+  description    String
+  resolvedAt     DateTime?
+  createdAt      DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, resolvedAt])
+}
+
+model Benchmark {
+  id            String   @id @default(cuid())
+  capability    String
+  promptVersion String
+  provider      String
+  model         String
+  datasetName   String
+  metrics       Json // precision/recall/acceptance-style metrics
+  runAt         DateTime @default(now())
+
+  @@index([capability, promptVersion])
+}
+
+// ============================================================================
+// AI Memory
+// ============================================================================
+
+model SprintMemory {
+  sprintId  String   @id
+  facts     Json
+  updatedAt DateTime @updatedAt
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMemory {
+  projectId String   @id
+  facts     Json
+  summary   String?
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model OrganizationMemory {
+  organizationId String   @id
+  preferences    Json
+  calibration    Json?
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model ConversationMemory {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  userId    String?
+  messages  Json // archived transcript
+  createdAt DateTime @default(now())
+  archivedAt DateTime?
+
+  @@index([sessionId])
+}
+
+// ============================================================================
+// Knowledge Intelligence
+// ============================================================================
+
+model KnowledgeNode {
+  id             String                      @id @default(cuid())
+  organizationId String
+  entityType     String // Story | Requirement | AcceptanceCriterion | TestCase | Defect | Release | DocumentChunk
+  entityId       String
+  embedding      Unsupported("vector(1536)")?
+  metadata       Json?
+  createdAt      DateTime                    @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  edgesFrom    KnowledgeEdge[] @relation("EdgeFrom")
+  edgesTo      KnowledgeEdge[] @relation("EdgeTo")
+
+  @@unique([organizationId, entityType, entityId])
+  @@index([organizationId, entityType])
+}
+
+model KnowledgeEdge {
+  id             String   @id @default(cuid())
+  organizationId String
+  fromNodeId     String
+  toNodeId       String
+  relationType   String // DERIVED_FROM | TESTED_BY | DEPENDS_ON | CAUSED_BY | PART_OF | AFFECTS
+  weight         Float    @default(1.0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  fromNode KnowledgeNode @relation("EdgeFrom", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode   KnowledgeNode @relation("EdgeTo", fields: [toNodeId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, relationType])
+  @@index([fromNodeId])
+  @@index([toNodeId])
+}
+
+// ============================================================================
+// Document Intelligence
+// ============================================================================
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model DocumentAsset {
+  id             String         @id @default(cuid())
+  organizationId String
+  projectId      String?
+  fileName       String
+  mimeType       String
+  sourceSystem   String? // confluence | notion | upload
+  storageUrl     String
+  status         DocumentStatus @default(UPLOADED)
+  language       String?
+  piiDetected    Boolean        @default(false)
+  uploadedBy     String
+  createdAt      DateTime       @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project?        @relation(fields: [projectId], references: [id])
+  chunks       DocumentChunk[]
+
+  @@index([organizationId])
+}
+
+model DocumentChunk {
+  id              String                      @id @default(cuid())
+  documentAssetId String
+  chunkIndex      Int
+  content         String
+  embedding       Unsupported("vector(1536)")?
+  metadata        Json?
+
+  documentAsset DocumentAsset @relation(fields: [documentAssetId], references: [id], onDelete: Cascade)
+
+  @@index([documentAssetId])
+}
+
+// ============================================================================
+// Integration Hub
+// ============================================================================
+
+model Connector {
+  id           String  @id @default(cuid())
+  key          String  @unique // jira | azure-devops | github | gitlab | linear | slack | teams | confluence | notion | testrail | xray | zephyr | azure-test-plans
+  name         String
+  isBuiltIn    Boolean @default(true)
+  configSchema Json
+
+  connections IntegrationConnection[]
+}
+
+enum ConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+model IntegrationConnection {
+  id                    String           @id @default(cuid())
+  organizationId        String
+  connectorId           String
+  name                  String
+  credentialsEncrypted  String // AES-256-GCM envelope-encrypted blob
+  status                ConnectionStatus @default(PENDING)
+  lastSyncedAt          DateTime?
+  config                Json?
+  createdAt             DateTime         @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connector    Connector      @relation(fields: [connectorId], references: [id])
+  webhookEvents WebhookEvent[]
+  syncJobs      SyncJob[]
+
+  @@index([organizationId])
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  DUPLICATE
+}
+
+model WebhookEvent {
+  id           String              @id @default(cuid())
+  connectionId String
+  externalId   String
+  eventType    String
+  payload      Json
+  status       WebhookEventStatus  @default(RECEIVED)
+  processedAt  DateTime?
+  createdAt    DateTime            @default(now())
+
+  connection IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalId])
+  @@index([connectionId, status])
+}
+
+enum SyncDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum SyncJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model SyncJob {
+  id           String        @id @default(cuid())
+  connectionId String
+  direction    SyncDirection
+  status       SyncJobStatus @default(QUEUED)
+  cursor       String?
+  error        String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime      @default(now())
+
+  connection IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, status])
+}
+
+// ============================================================================
+// Feature Management
+// ============================================================================
+
+model FeatureFlag {
+  id           String  @id @default(cuid())
+  key          String  @unique
+  description  String?
+  defaultValue Json
+  isBeta       Boolean @default(false)
+  createdAt    DateTime @default(now())
+
+  overrides   FeatureFlagOverride[]
+  experiments Experiment[]
+}
+
+model FeatureFlagOverride {
+  id                String   @id @default(cuid())
+  flagId            String
+  organizationId    String?
+  userId            String?
+  value             Json
+  rolloutPercentage Int      @default(100)
+  createdAt         DateTime @default(now())
+
+  flag         FeatureFlag   @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([flagId, organizationId])
+}
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  COMPLETED
+}
+
+model Experiment {
+  id        String           @id @default(cuid())
+  flagId    String
+  name      String
+  variants  Json // [{ key, weight }]
+  metric    String
+  status    ExperimentStatus @default(DRAFT)
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  flag FeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId])
+}
+
+// ============================================================================
+// Plugin Framework
+// ============================================================================
+
+enum PluginType {
+  AI_PROVIDER
+  INTEGRATION
+  PROMPT
+  AGENT
+  WORKFLOW_NODE
+}
+
+model Plugin {
+  id        String     @id @default(cuid())
+  key       String     @unique
+  name      String
+  type      PluginType
+  version   String
+  isBuiltIn Boolean    @default(true)
+  manifest  Json
+  createdAt DateTime   @default(now())
+
+  installations PluginInstallation[]
+}
+
+model PluginInstallation {
+  id             String   @id @default(cuid())
+  pluginId       String
+  organizationId String
+  isEnabled      Boolean  @default(true)
+  config         Json?
+  createdAt      DateTime @default(now())
+
+  plugin       Plugin       @relation(fields: [pluginId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([pluginId, organizationId])
+}
+
+// ============================================================================
+// Workflow Engine
+// ============================================================================
+
+enum WorkflowDefinitionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  DEPRECATED
+}
+
+model WorkflowDefinition {
+  id             String                   @id @default(cuid())
+  organizationId String
+  name           String
+  version        String
+  graph          Json // serialized node/edge graph
+  status         WorkflowDefinitionStatus @default(DRAFT)
+  isActive       Boolean                  @default(false)
+  createdBy      String
+  createdAt      DateTime                 @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runs         WorkflowRun[]
+
+  @@unique([organizationId, name, version])
+}
+
+enum WorkflowRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model WorkflowRun {
+  id                   String            @id @default(cuid())
+  workflowDefinitionId String
+  status               WorkflowRunStatus @default(PENDING)
+  input                Json
+  output               Json?
+  startedAt            DateTime          @default(now())
+  completedAt          DateTime?
+
+  workflowDefinition WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+
+  @@index([workflowDefinitionId])
+}
+
+// ============================================================================
+// Realtime & Notification
+// ============================================================================
+
+enum NotificationChannel {
+  IN_APP
+  SLACK
+  TEAMS
+  EMAIL
+}
+
+model NotificationEvent {
+  id             String              @id @default(cuid())
+  organizationId String
+  userId         String?
+  type           String
+  title          String
+  body           String?
+  payload        Json?
+  channel        NotificationChannel @default(IN_APP)
+  readAt         DateTime?
+  sentAt         DateTime?
+  createdAt      DateTime            @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, userId, readAt])
+}
+
+// ============================================================================
+// SaaS Platform
+// ============================================================================
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+model Subscription {
+  id                        String             @id @default(cuid())
+  organizationId            String
+  plan                      String // starter | growth | enterprise
+  status                    SubscriptionStatus @default(TRIALING)
+  seats                     Int                @default(5)
+  billingProviderCustomerId String?
+  billingProviderSubId      String?
+  currentPeriodEnd          DateTime?
+  createdAt                 DateTime           @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model UsageQuota {
+  id             String   @id @default(cuid())
+  organizationId String
+  metric         String // ai_tokens | integration_connections | seats
+  limit          Int
+  used           Int      @default(0)
+  periodStart    DateTime
+  periodEnd      DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, metric, periodStart])
+}
+
+model TenantBranding {
+  organizationId String  @id
+  logoUrl        String?
+  primaryColor   String?
+  customDomain   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================================
+// Platform / Audit
+// ============================================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  actorId        String?
+  action         String // e.g. "prompt.promoted", "sprint.imported", "user.invited"
+  targetType     String
+  targetId       String
+  before         Json?
+  after          Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([targetType, targetId])
+}
+
+// ============================================================================
+// Transactional Outbox (Event-Driven reliability, Solution Architecture §9.2)
+// ============================================================================
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model OutboxMessage {
+  id          String       @id @default(cuid())
+  eventType   String
+  payload     Json
+  status      OutboxStatus @default(PENDING)
+  publishedAt DateTime?
+  createdAt   DateTime     @default(now())
+
+  @@index([status, createdAt])
+}

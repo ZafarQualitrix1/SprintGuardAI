@@ -1,0 +1,116 @@
+# Local development stack (Solution Architecture §27: "local" environment = Docker Compose,
+# identical images promoted through dev/staging/production). Not used for production deployment
+# directly -- prod runs these same images under Kubernetes with managed Postgres/Redis instead of
+# these two containers.
+#
+# Usage:
+#   cp .env.example .env        # fill in real secrets/API keys
+#   docker compose up --build   # builds api+web images, runs migrate+seed once, then starts both
+
+name: sprintguard
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sprintguard
+      POSTGRES_PASSWORD: sprintguard
+      POSTGRES_DB: sprintguard
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sprintguard -d sprintguard']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: applies pending Prisma migrations, then exits. `api` waits for this to succeed
+  # before starting (Solution Architecture §27: migrations run as a pre-deploy job, not baked
+  # into every replica's container startup).
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: installer
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://sprintguard:sprintguard@postgres:5432/sprintguard?schema=public
+    command: ['pnpm', '--filter', '@sprintguard/database', 'exec', 'prisma', 'migrate', 'deploy']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-shot: seeds RBAC roles/permissions, connector catalog, Agent/Model/Prompt registry
+  # (packages/database/prisma/seed.ts). Safe to re-run (upsert-based).
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: installer
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql://sprintguard:sprintguard@postgres:5432/sprintguard?schema=public
+    command: ['pnpm', '--filter', '@sprintguard/database', 'exec', 'prisma', 'db', 'seed']
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://sprintguard:sprintguard@postgres:5432/sprintguard?schema=public
+      REDIS_URL: redis://redis:6379
+      WEB_URL: http://localhost:3000
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:3001/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+    ports:
+      - '3000:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
