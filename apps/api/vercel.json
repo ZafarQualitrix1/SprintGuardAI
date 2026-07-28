@@ -1,0 +1,5 @@
+{
+  "installCommand": "pnpm install --prod=false",
+  "buildCommand": "pnpm --filter @sprintguard/database exec prisma generate && pnpm turbo run build --filter=@sprintguard/api... && pnpm exec ncc build dist/serverless.js -o dist-bundle -e argon2 -e @prisma/client",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}

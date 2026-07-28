@@ -60,6 +60,15 @@ interface JiraIssueSearchResponse {
 const MAX_ISSUES = 500;
 const PAGE_SIZE = 100;
 
+// Node's global `fetch`/`Response` ambient types resolve inconsistently across build
+// environments depending on which `@types/node` copy a pnpm install happens to hoist -- this
+// pins the response shape this file actually relies on so type-checking doesn't depend on that.
+interface FetchResponse {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}
+
 function extractPlainText(node: string | JiraAdfNode | null | undefined): string | null {
   if (!node) return null;
   if (typeof node === 'string') return node;
@@ -92,9 +101,9 @@ export class JiraConnectorService implements IIntegrationConnector {
     const jiraCredentials = credentials as JiraCredentials;
     const jiraConfig = config as unknown as JiraConfig;
 
-    const response = await fetch(`${jiraConfig.siteUrl}/rest/api/3/myself`, {
+    const response = (await fetch(`${jiraConfig.siteUrl}/rest/api/3/myself`, {
       headers: { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' },
-    });
+    })) as unknown as FetchResponse;
 
     if (!response.ok) {
       throw new UnauthorizedException(
@@ -119,10 +128,10 @@ export class JiraConnectorService implements IIntegrationConnector {
         throw error;
       }
 
-      const response = await fetch(
+      const response = (await fetch(
         `${jiraConfig.siteUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future`,
         { headers },
-      );
+      )) as unknown as FetchResponse;
       if (!response.ok) {
         throw new BadRequestException(
           `Could not look up sprints for Jira board ${boardId} (HTTP ${response.status}).`,
@@ -149,9 +158,9 @@ export class JiraConnectorService implements IIntegrationConnector {
     const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
     const sprintId = await this.resolveSprintId(reference, jiraConfig, headers);
 
-    const sprintResponse = await fetch(`${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}`, {
+    const sprintResponse = (await fetch(`${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}`, {
       headers,
-    });
+    })) as unknown as FetchResponse;
     if (!sprintResponse.ok) {
       throw new Error(`Failed to fetch Jira sprint ${sprintId} (HTTP ${sprintResponse.status})`);
     }
@@ -161,10 +170,10 @@ export class JiraConnectorService implements IIntegrationConnector {
     let startAt = 0;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const issuesResponse = await fetch(
+      const issuesResponse = (await fetch(
         `${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}/issue?startAt=${startAt}&maxResults=${PAGE_SIZE}&fields=summary,description,status,assignee,priority,customfield_10016`,
         { headers },
-      );
+      )) as unknown as FetchResponse;
       if (!issuesResponse.ok) {
         throw new Error(`Failed to fetch issues for Jira sprint ${sprintId} (HTTP ${issuesResponse.status})`);
       }
