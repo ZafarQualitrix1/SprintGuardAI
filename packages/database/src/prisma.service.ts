@@ -35,7 +35,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error(`Invalid organizationId for tenant context: ${organizationId}`);
     }
 
-    return this.$transaction(async (tx) => {
+    return this.$transaction(async (tx: any) => {
       await tx.$executeRawUnsafe(`SET LOCAL app.current_org_id = '${organizationId}'`);
       return fn(tx);
     });

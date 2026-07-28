@@ -19,7 +19,6 @@ import { IAMModule } from './modules/iam/iam.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { RequirementIntelligenceModule } from './modules/requirement-intelligence/requirement-intelligence.module';
 import { TestIntelligenceModule } from './modules/test-intelligence/test-intelligence.module';
-import { CoverageModule } from './modules/coverage/coverage.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { DefectModule } from './modules/defect/defect.module';
@@ -71,7 +70,6 @@ import { PlatformModule } from './modules/platform/platform.module';
     SprintModule,
     RequirementIntelligenceModule,
     TestIntelligenceModule,
-    CoverageModule,
     ExecutionModule,
     ReleaseModule,
     DefectModule,
