@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import tailwindcssAnimate from 'tailwindcss-animate';
 
 // ShadCN UI convention: CSS variables defined in globals.css, mapped here so components
 // (`components/ui/*`) work in both light and dark mode without per-component conditionals.
@@ -65,7 +66,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [tailwindcssAnimate],
 };
 
 export default config;

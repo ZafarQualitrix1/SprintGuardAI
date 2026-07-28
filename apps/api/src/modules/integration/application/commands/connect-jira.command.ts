@@ -28,7 +28,9 @@ export class ConnectJiraHandler implements ICommandHandler<ConnectJiraCommand, I
   ) {}
 
   async execute(command: ConnectJiraCommand): Promise<IntegrationConnectionEntity> {
-    const config = { siteUrl: command.siteUrl.replace(/\/+$/, '') };
+    // Normalize to just the site origin -- users often paste a board/project URL rather than the
+    // bare Jira site root, and every downstream Agile API call is built as `${siteUrl}/rest/...`.
+    const config = { siteUrl: new URL(command.siteUrl).origin };
     const credentials = { email: command.email, apiToken: command.apiToken };
 
     // Fail fast with a clear error rather than persisting a connection that can never fetch data.

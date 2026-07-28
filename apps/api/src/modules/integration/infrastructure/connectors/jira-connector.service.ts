@@ -1,11 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import {
   ConnectorCredentials,
   ExternalSprintPayload,
   ExternalStoryPayload,
   IIntegrationConnector,
 } from '../../application/ports/integration-connector.port';
-import { parseJiraSprintReference } from './jira-reference.util';
+import { extractJiraBoardId, parseJiraSprintReference } from './jira-reference.util';
 
 interface JiraCredentials extends ConnectorCredentials {
   email: string;
@@ -22,6 +22,11 @@ interface JiraSprintResponse {
   goal?: string;
   startDate?: string;
   endDate?: string;
+  state?: string;
+}
+
+interface JiraBoardSprintsResponse {
+  values: JiraSprintResponse[];
 }
 
 interface JiraAdfNode {
@@ -98,6 +103,42 @@ export class JiraConnectorService implements IIntegrationConnector {
     }
   }
 
+  // Company-managed board backlog URLs carry ?sprintId=; team-managed boards never do, so a plain
+  // board URL is all those users can copy. Falls back to the board's active (or next future)
+  // sprint via the Agile API rather than forcing users to hunt for an id that doesn't exist for them.
+  private async resolveSprintId(
+    reference: string,
+    jiraConfig: JiraConfig,
+    headers: Record<string, string>,
+  ): Promise<string> {
+    try {
+      return parseJiraSprintReference(reference);
+    } catch (error) {
+      const boardId = extractJiraBoardId(reference);
+      if (!boardId) {
+        throw error;
+      }
+
+      const response = await fetch(
+        `${jiraConfig.siteUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future`,
+        { headers },
+      );
+      if (!response.ok) {
+        throw new BadRequestException(
+          `Could not look up sprints for Jira board ${boardId} (HTTP ${response.status}).`,
+        );
+      }
+      const { values } = (await response.json()) as JiraBoardSprintsResponse;
+      const sprint = values.find((s) => s.state === 'active') ?? values[0];
+      if (!sprint) {
+        throw new BadRequestException(
+          `Board ${boardId} has no active or upcoming sprint. Paste the numeric sprint id or a URL containing ?sprintId=... instead.`,
+        );
+      }
+      return String(sprint.id);
+    }
+  }
+
   async fetchSprint(
     reference: string,
     credentials: ConnectorCredentials,
@@ -105,8 +146,8 @@ export class JiraConnectorService implements IIntegrationConnector {
   ): Promise<ExternalSprintPayload> {
     const jiraCredentials = credentials as JiraCredentials;
     const jiraConfig = config as unknown as JiraConfig;
-    const sprintId = parseJiraSprintReference(reference);
     const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+    const sprintId = await this.resolveSprintId(reference, jiraConfig, headers);
 
     const sprintResponse = await fetch(`${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}`, {
       headers,
