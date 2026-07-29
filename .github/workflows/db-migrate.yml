@@ -1,0 +1,68 @@
+name: DB Migrate
+
+# Promotes Prisma migrations to each environment's own Supabase Postgres project, gated by a
+# GitHub Environment per branch (docs/architecture/07-environment-isolation.md §6). This is
+# deliberately NOT part of the Vercel build (apps/api/vercel.json only runs `prisma generate`) --
+# migrations must run from a controlled runner, once, rather than on every serverless build.
+#
+# migrate-uat runs unattended on every push to `uat`. migrate-production runs on every push to
+# `master` (i.e. after a reviewed uat->master merge) but is held by the `production` GitHub
+# Environment's required-reviewer rule -- configure that rule in Settings -> Environments
+# (documented in the isolation doc; cannot be set from a workflow file).
+
+on:
+  push:
+    branches: [uat, master]
+
+concurrency:
+  group: db-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  migrate-uat:
+    if: github.ref == 'refs/heads/uat'
+    runs-on: ubuntu-latest
+    environment: uat
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply pending migrations to SprintGuardAI_UAT
+        run: pnpm db:deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  migrate-production:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply the same migrations to SprintGuardAI (production)
+        run: pnpm db:deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

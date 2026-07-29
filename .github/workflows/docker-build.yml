@@ -2,14 +2,14 @@ name: Docker Build & Push
 
 # Builds and pushes both app images to GitHub Container Registry, tagged by commit SHA
 # (Solution Architecture §27: "identical container images promoted across environments").
-# Runs only after CI passes on main -- this workflow does not itself deploy anywhere; promoting
+# Runs only after CI passes on uat/master -- this workflow does not itself deploy anywhere; promoting
 # an image tag to staging/production is a manual approval-gated step per the same architecture
 # section, left for the target platform's own deploy tooling (K8s/ArgoCD/etc.) to wire up.
 
 on:
   workflow_run:
     workflows: ['CI']
-    branches: [main]
+    branches: [uat, master]
     types: [completed]
 
 permissions:
