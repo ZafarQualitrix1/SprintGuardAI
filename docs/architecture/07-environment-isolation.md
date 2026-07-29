@@ -17,7 +17,7 @@ and what this change set does about it:
 
 | Finding | Fix |
 |---|---|
-| None of the 4 Vercel projects were connected to GitHub — all deploys so far were manual `vercel deploy` CLI runs. "Push → auto-deploy" did not exist. | Documented as the required manual runbook in §4.3 — connecting real GitHub webhooks can trigger an immediate deployment, so this is a hands-on dashboard step, not something applied blind. |
+| **Correction (2026-07-29, later same day):** the original audit concluded none of the 4 projects were connected to GitHub — this was wrong. `vercel project inspect` simply doesn't surface git connection status in this CLI version. `sprintguardai_uat`/`sprintguardai-api-uat` were already connected (confirmed via `vercel git connect`, which reported "already connected", and via a real `sprintguardaiuat-git-master-...` preview deployment). The actual gap: **Production Branch isn't set to `uat`/`master`**, so pushes build as Preview deployments that never touch the live Production alias — this is what caused a teammate's push to `uat` to not appear on `sprintguardaiuat.vercel.app`. | Fixed for `sprintguardai_uat`/`sprintguardai-api-uat`: pulled and manually deployed the missed commit to unblock the team immediately. **Still open** (dashboard-only setting, no CLI flag exists in `vercel project update`/`vercel git connect`): set Production Branch on all 4 projects per §4.3. |
 | GitHub's default branch is `main`, 2 commits behind. `master` and `uat` were already identical (`4ccdba2`) — `master` had been pushed to directly, not merged via PR. | **Decision: `master` is production going forward**; `main` is legacy (left alone, not deleted). |
 | `apps/api/.vercel/project.json` was linked to `sprintguardai-api-prod` while the repo was checked out on the UAT branch — a live footgun (a bare `vercel deploy` from `apps/api` would have shipped to production). | Fixed — relinked to `sprintguardai-api-uat`, matching `apps/web`'s (already-correct) link. Redundant root-level `.vercel/` link removed entirely. |
 | `sprintguardai-api-uat`'s cached Build Command was missing the `ncc` bundling step that `sprintguardai-api-prod` had; the two projects' settings had drifted. | Fixed — both projects reset to **Auto** for Build/Install Command via `vercel project update --auto-detect`, so `apps/api/vercel.json` (committed, identical on both branches) is now the single source of truth. Can't drift again. |
@@ -196,20 +196,25 @@ This is what makes Rule 3 ("UAT deployment can never overwrite Production" etc.)
 than procedural — even a stray push or a misconfigured PR can't cause cross-deployment, because the
 non-matching project's build simply never runs.
 
-### 4.3 Manual runbook — connecting Git (do this per project, in this exact order)
+### 4.3 Manual runbook — remaining step is just Production Branch
 
-Not done this session: connecting a live GitHub webhook to 4 real projects can trigger an immediate
-deployment, and this Vercel CLI version has no flag to set Production Branch — so a partial CLI
-attempt would leave a project connected but pointed at the wrong branch. Do each project fully
-before moving to the next:
+**Correction:** all 4 projects turned out to already be connected to `ZafarQualitrix1/SprintGuardAI`
+(confirmed 2026-07-29 via `vercel git connect`, which reports "already connected" for each). The
+original plan to "connect Git" was unnecessary — that step is done. What's still missing, and still
+can't be set from this CLI version (`vercel project update` has no such flag), is **Production
+Branch**. Without it, pushes build as Preview deployments that never touch the live Production alias
+— this is exactly what caused a teammate's push to `uat` to silently not appear on
+`sprintguardaiuat.vercel.app` (root-caused and manually deployed around as a one-off same day).
 
-1. **Project Settings → Git → Connect** → select `ZafarQualitrix1/SprintGuardAI`.
-2. **Project Settings → Git → Production Branch** → set to `master` (for the two `*prod` projects)
-   or `uat` (for the two `*uat` projects). Do this immediately after connecting, before any push.
-3. **Project Settings → Git → Ignored Build Step** → paste the matching script from §4.2.
+Per project, **Project Settings → Git → Production Branch** → set to `master` (for
+`sprintguardai_prod` / `sprintguardai-api-prod`) or `uat` (for `sprintguardai_uat` /
+`sprintguardai-api-uat`). While there, also paste in the matching **Ignored Build Step** script from
+§4.2 — without it, every other branch (feature branches, PRs) will still trigger Preview builds,
+which is harmless but noisy/wasteful.
 
-Repeat for all 4 projects. Only after all 4 have their Ignored Build Step in place should you push
-to `uat` or `master` to test the pipeline end-to-end (§10).
+This is the single remaining step to make "push → auto-deploy" fully real. Until it's done, treat
+every push as requiring a manual `vercel deploy --prod` (as documented in §1.1's operational note)
+to actually reach the live site.
 
 ---
 
