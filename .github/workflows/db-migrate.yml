@@ -48,6 +48,12 @@ jobs:
           console.log('raw length:', raw.length);
           console.log('starts with postgresql://:', raw.startsWith('postgresql://'));
           console.log('first 15 chars (safe prefix only):', JSON.stringify(raw.slice(0, 15)));
+          console.log('last 40 chars (safe suffix -- host/port/db, no password there):', JSON.stringify(raw.slice(-40)));
+          console.log('count of @ symbols:', (raw.match(/@/g) || []).length);
+          console.log('count of : symbols:', (raw.match(/:/g) || []).length);
+          console.log('has newline/tab/CR:', /[\n\t\r]/.test(raw));
+          console.log('has space:', raw.includes(' '));
+          console.log('has literal quote char:', raw.includes('\"') || raw.includes(\"'\"));
           try {
             const u = new URL(raw);
             console.log('protocol:', u.protocol);
