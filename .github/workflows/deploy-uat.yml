@@ -8,8 +8,9 @@ name: Deploy UAT
 # Production-target deploy regardless of that setting, so this workflow is what actually makes
 # "push to uat -> live on sprintguardaiuat.vercel.app" true for a multi-developer team.
 #
-# Requires one repository secret: VERCEL_TOKEN (Vercel Account Settings -> Tokens -> Create,
-# then GitHub repo Settings -> Secrets and variables -> Actions -> New repository secret).
+# Requires VERCEL_TOKEN as a secret on the `uat` GitHub Environment (Settings -> Environments ->
+# uat -> Environment secrets -> Add environment secret) -- NOT as an Environment *variable*,
+# those aren't encrypted. The job below declares `environment: uat` so it can read it.
 # Project/org IDs below are identifiers, not secrets -- same ones already committed in
 # apps/web/.vercel and apps/api/.vercel locally.
 
@@ -27,6 +28,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: uat
     strategy:
       matrix:
         include:
