@@ -38,36 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # TEMPORARY diagnostic -- prints only the non-secret parts of DATABASE_URL (host/port/
-      # username/path length) to debug a P1013 "empty host" parse error, without ever logging
-      # the password. Remove once the secret is confirmed well-formed.
-      - name: Debug DATABASE_URL shape (no secrets printed)
-        run: |
-          node -e "
-          const raw = process.env.DATABASE_URL || '';
-          console.log('raw length:', raw.length);
-          console.log('starts with postgresql://:', raw.startsWith('postgresql://'));
-          console.log('first 15 chars (safe prefix only):', JSON.stringify(raw.slice(0, 15)));
-          console.log('last 40 chars (safe suffix -- host/port/db, no password there):', JSON.stringify(raw.slice(-40)));
-          console.log('count of @ symbols:', (raw.match(/@/g) || []).length);
-          console.log('count of : symbols:', (raw.match(/:/g) || []).length);
-          console.log('has newline/tab/CR:', /[\n\t\r]/.test(raw));
-          console.log('has space:', raw.includes(' '));
-          console.log('has literal quote char:', raw.includes('\"') || raw.includes(\"'\"));
-          try {
-            const u = new URL(raw);
-            console.log('protocol:', u.protocol);
-            console.log('username:', u.username);
-            console.log('host:', u.hostname);
-            console.log('port:', u.port);
-            console.log('pathname:', u.pathname);
-          } catch (e) {
-            console.log('URL constructor threw:', e.message);
-          }
-          "
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
       - name: Apply pending migrations to SprintGuardAI_UAT
         run: pnpm db:deploy
         env:
