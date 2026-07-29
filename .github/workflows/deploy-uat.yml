@@ -1,0 +1,48 @@
+name: Deploy UAT
+
+# Explicit CI-driven deploy for uat, independent of Vercel's own Git integration.
+# Both sprintguardai_uat and sprintguardai-api-uat are already connected to this repo, but their
+# Production Branch dashboard setting isn't uat -- that field has no CLI/API equivalent this repo's
+# tooling can set, so native pushes build as untargeted Preview deployments that never reach the
+# live site (docs/architecture/07-environment-isolation.md §4.3). `vercel deploy --prod` forces a
+# Production-target deploy regardless of that setting, so this workflow is what actually makes
+# "push to uat -> live on sprintguardaiuat.vercel.app" true for a multi-developer team.
+#
+# Requires one repository secret: VERCEL_TOKEN (Vercel Account Settings -> Tokens -> Create,
+# then GitHub repo Settings -> Secrets and variables -> Actions -> New repository secret).
+# Project/org IDs below are identifiers, not secrets -- same ones already committed in
+# apps/web/.vercel and apps/api/.vercel locally.
+
+on:
+  push:
+    branches: [uat]
+
+concurrency:
+  group: deploy-uat-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_ihWVgXt3H6QfkAcaviCEYpad
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - app: web
+            project_id: prj_IxuVIoe1SCzdJ6qlA08AlqcDI0wT
+            project_name: sprintguardai_uat
+          - app: api
+            project_id: prj_zwrHnQaRR3bcv3Bax4zjNkgUIfJi
+            project_name: sprintguardai-api-uat
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link ${{ matrix.project_name }}
+        run: |
+          mkdir -p .vercel
+          echo '{"projectId":"${{ matrix.project_id }}","orgId":"${{ env.VERCEL_ORG_ID }}","projectName":"${{ matrix.project_name }}"}' > .vercel/project.json
+
+      - name: Deploy to Vercel (production target)
+        run: npx --yes vercel@58.3.0 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}

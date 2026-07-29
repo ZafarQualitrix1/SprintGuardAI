@@ -196,25 +196,36 @@ This is what makes Rule 3 ("UAT deployment can never overwrite Production" etc.)
 than procedural — even a stray push or a misconfigured PR can't cause cross-deployment, because the
 non-matching project's build simply never runs.
 
-### 4.3 Manual runbook — remaining step is just Production Branch
+### 4.3 How "push → auto-deploy" is actually implemented: CI-driven, not Vercel's native Git integration
 
 **Correction:** all 4 projects turned out to already be connected to `ZafarQualitrix1/SprintGuardAI`
-(confirmed 2026-07-29 via `vercel git connect`, which reports "already connected" for each). The
-original plan to "connect Git" was unnecessary — that step is done. What's still missing, and still
-can't be set from this CLI version (`vercel project update` has no such flag), is **Production
-Branch**. Without it, pushes build as Preview deployments that never touch the live Production alias
-— this is exactly what caused a teammate's push to `uat` to silently not appear on
-`sprintguardaiuat.vercel.app` (root-caused and manually deployed around as a one-off same day).
+(confirmed 2026-07-29 via `vercel git connect`, which reports "already connected" for each) — the
+original "connect Git" plan was unnecessary. But their **Production Branch** dashboard setting isn't
+`uat`/`master`, so native pushes build as Preview deployments that never touch the live Production
+alias — this silently broke a teammate's `uat` push. That field has no CLI or API path this repo's
+tooling can drive (`vercel project update` doesn't cover it), so rather than depend on a dashboard
+field nobody can automate, the actual trigger is **`.github/workflows/deploy-uat.yml` /
+`deploy-prod.yml`**: on every push to `uat`/`master`, CI links the correct project directly (writing
+`.vercel/project.json` with the right `projectId`/`orgId`) and runs `vercel deploy --prod`, which
+forces a Production-target deploy regardless of what the dashboard's Production Branch says. This is
+the same command (and the same repo-root-link pattern to dodge the Root-Directory-doubling bug from
+§1.1's operational note) used to fix the login/signup outage and the missed teammate push manually —
+now automated instead of requiring someone to run it by hand every time.
 
-Per project, **Project Settings → Git → Production Branch** → set to `master` (for
-`sprintguardai_prod` / `sprintguardai-api-prod`) or `uat` (for `sprintguardai_uat` /
-`sprintguardai-api-uat`). While there, also paste in the matching **Ignored Build Step** script from
-§4.2 — without it, every other branch (feature branches, PRs) will still trigger Preview builds,
-which is harmless but noisy/wasteful.
+**One setup step required, not done this session (needs a Vercel account action, not just repo
+config):** create a Vercel Access Token — Vercel → Account Settings → Tokens → Create — and add it as
+a GitHub repository secret named `VERCEL_TOKEN` (repo Settings → Secrets and variables → Actions →
+New repository secret). Both workflows are inert without it (the deploy step will fail auth).
 
-This is the single remaining step to make "push → auto-deploy" fully real. Until it's done, treat
-every push as requiring a manual `vercel deploy --prod` (as documented in §1.1's operational note)
-to actually reach the live site.
+`deploy-prod.yml` runs under the `production` GitHub Environment (§6) — once that environment has a
+required-reviewer rule configured, every `master` push waits for explicit approval before deploying,
+which is the actual technical enforcement behind "never deploy to production without asking first,"
+not just a chat convention.
+
+**Optional, not required for the pipeline to work:** still set Production Branch + the §4.2 Ignored
+Build Step in each project's dashboard if you want to stop Vercel's *native* Git integration from
+also building an unused Preview deployment on every push (harmless, just wasted build minutes) —
+that's independent of and redundant with the CI-driven deploy above.
 
 ---
 

@@ -1,0 +1,44 @@
+name: Deploy Production
+
+# Mirrors deploy-uat.yml for master -> sprintguardai_prod / sprintguardai-api-prod. Gated by the
+# `production` GitHub Environment's required-reviewer rule (same environment db-migrate.yml's
+# migrate-production job uses) -- this is the actual technical enforcement of "never deploy to
+# production without asking first" (docs/architecture/07-environment-isolation.md), not just a
+# convention. Configure that reviewer rule in Settings -> Environments -> production before this
+# can run unattended; until then every run sits waiting for approval, which is the intended
+# fail-safe default.
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: team_ihWVgXt3H6QfkAcaviCEYpad
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      matrix:
+        include:
+          - app: web
+            project_id: prj_VA9Ijuis4aQ46IMUW5pldkmaUvRy
+            project_name: sprintguardai_prod
+          - app: api
+            project_id: prj_78HeHuxxKNwcfkOg1ZxmYntjyJg1
+            project_name: sprintguardai-api-prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Link ${{ matrix.project_name }}
+        run: |
+          mkdir -p .vercel
+          echo '{"projectId":"${{ matrix.project_id }}","orgId":"${{ env.VERCEL_ORG_ID }}","projectName":"${{ matrix.project_name }}"}' > .vercel/project.json
+
+      - name: Deploy to Vercel (production target)
+        run: npx --yes vercel@58.3.0 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
