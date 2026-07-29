@@ -32,6 +32,8 @@ jobs:
           - app: api
             project_id: prj_78HeHuxxKNwcfkOg1ZxmYntjyJg1
             project_name: sprintguardai-api-prod
+    env:
+      VERCEL_PROJECT_ID: ${{ matrix.project_id }}
     steps:
       - uses: actions/checkout@v4
 
