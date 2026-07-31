@@ -60,6 +60,7 @@ export class PrismaIdentityOnboardingRepository implements IIdentityOnboardingRe
         organization: true,
         role: { include: { rolePermissions: { include: { permission: true } } } },
       },
+      relationLoadStrategy: 'join',
     });
 
     return {

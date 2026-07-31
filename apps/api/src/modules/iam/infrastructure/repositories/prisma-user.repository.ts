@@ -18,11 +18,14 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByEmailWithPrimaryMembership(email: string): Promise<UserWithPrimaryMembership | null> {
+    // relationLoadStrategy 'join': see the comment on PrismaMembershipRepository.findPrimaryByUserId
+    // -- same fan-out problem, this time on the login path.
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
         memberships: { include: membershipInclude, orderBy: { createdAt: 'asc' }, take: 1 },
       },
+      relationLoadStrategy: 'join',
     });
     if (!user) {
       return null;
@@ -44,6 +47,7 @@ export class PrismaUserRepository implements IUserRepository {
       include: {
         memberships: { where: { organizationId }, include: membershipInclude, take: 1 },
       },
+      relationLoadStrategy: 'join',
     });
     if (!user) {
       return null;
