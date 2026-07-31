@@ -151,5 +151,115 @@ describe('JiraConnectorService', () => {
         /Failed to fetch Jira sprint 42/,
       );
     });
+
+    it('resolves a board reference with no sprintId via fetchActiveSprints', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({
+            values: [
+              { id: 10, name: 'Sprint 10', state: 'future' },
+              { id: 9, name: 'Sprint 9', state: 'active' },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse({ id: 9, name: 'Sprint 9' }))
+        .mockResolvedValueOnce(jsonResponse({ startAt: 0, maxResults: 100, total: 0, issues: [] }));
+
+      await connector.fetchSprint(
+        'https://acme.atlassian.net/jira/software/projects/PROJ/boards/7',
+        credentials,
+        config,
+      );
+
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        'https://acme.atlassian.net/rest/agile/1.0/board/7/sprint?state=active,future',
+        expect.any(Object),
+      );
+      // Active sprint preferred over future when both are present.
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        'https://acme.atlassian.net/rest/agile/1.0/sprint/9',
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('fetchProjects', () => {
+    it('paginates until isLast and maps to the canonical project payload', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({
+            startAt: 0,
+            maxResults: 1,
+            total: 2,
+            isLast: false,
+            values: [
+              { key: 'PROJ', name: 'Project One', avatarUrls: { '48x48': 'https://avatar/1' }, lead: { displayName: 'Jane' } },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            startAt: 1,
+            maxResults: 1,
+            total: 2,
+            isLast: true,
+            values: [{ key: 'OPS', name: 'Ops', avatarUrls: {}, lead: undefined }],
+          }),
+        );
+
+      const result = await connector.fetchProjects(credentials, config);
+
+      expect(result).toEqual([
+        { externalKey: 'PROJ', name: 'Project One', avatarUrl: 'https://avatar/1', lead: 'Jane' },
+        { externalKey: 'OPS', name: 'Ops', avatarUrl: null, lead: null },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws BadRequestException when the project search fails', async () => {
+      fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 403));
+
+      await expect(connector.fetchProjects(credentials, config)).rejects.toThrow(/Could not list Jira projects/);
+    });
+  });
+
+  describe('fetchBoards', () => {
+    it('maps boards for a project', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({ values: [{ id: 5, name: 'Sprint Board', type: 'scrum' }] }),
+      );
+
+      const result = await connector.fetchBoards('PROJ', credentials, config);
+
+      expect(result).toEqual([{ id: '5', name: 'Sprint Board', type: 'scrum' }]);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://acme.atlassian.net/rest/agile/1.0/board?projectKeyOrId=PROJ',
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('fetchActiveSprints', () => {
+    it('maps active/future sprints for a board', async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({
+          values: [{ id: 9, name: 'Sprint 9', state: 'active', startDate: '2026-01-01T00:00:00.000Z' }],
+        }),
+      );
+
+      const result = await connector.fetchActiveSprints('7', credentials, config);
+
+      expect(result).toEqual([
+        {
+          externalId: '9',
+          name: 'Sprint 9',
+          state: 'active',
+          startDate: new Date('2026-01-01T00:00:00.000Z'),
+          endDate: null,
+        },
+      ]);
+    });
   });
 });

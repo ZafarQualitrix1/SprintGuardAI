@@ -24,6 +24,30 @@ export interface ConnectorCredentials {
   [key: string]: string;
 }
 
+// Wizard-support payloads (step 2/3/4 of the guided import flow) -- deliberately thinner than
+// ExternalSprintPayload/ExternalStoryPayload since these only exist to populate pickers, never to
+// persist domain data directly.
+export interface ExternalProjectPayload {
+  externalKey: string;
+  name: string;
+  avatarUrl: string | null;
+  lead: string | null;
+}
+
+export interface ExternalBoardPayload {
+  id: string;
+  name: string;
+  type: string;
+}
+
+export interface ExternalActiveSprintPayload {
+  externalId: string;
+  name: string;
+  state: string;
+  startDate: Date | null;
+  endDate: Date | null;
+}
+
 // Implemented once per external system (Jira first -- Solution Architecture §18's reference
 // implementation -- Linear next, behind this same port). A "Connector Registry" in the
 // architecture sense is, for this MVP scope, the simple key->instance map built in
@@ -38,6 +62,20 @@ export interface IIntegrationConnector {
     credentials: ConnectorCredentials,
     config: Record<string, unknown>,
   ): Promise<ExternalSprintPayload>;
+  /** Import wizard step 2 / connection card "Open Projects" / "Sync Now". */
+  fetchProjects(credentials: ConnectorCredentials, config: Record<string, unknown>): Promise<ExternalProjectPayload[]>;
+  /** Import wizard step 3. */
+  fetchBoards(
+    projectKey: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalBoardPayload[]>;
+  /** Import wizard step 4. */
+  fetchActiveSprints(
+    boardId: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalActiveSprintPayload[]>;
 }
 
 // Multi-provider injection token: integration.module.ts binds this to an array of every

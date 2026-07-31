@@ -1,0 +1,23 @@
+name: Integration Health Check
+
+# Triggers the Jira Connection Center's automatic health-check sweep every 15 minutes.
+# Not a native Vercel Cron: Vercel's Hobby plan caps cron jobs at once/day, which can't deliver a
+# 15-minute cadence (confirmed via Vercel's docs) -- this GitHub Actions schedule is the actual
+# mechanism, mirroring the deploy-uat.yml/db-migrate.yml pattern already used in this repo.
+# Requires the INTERNAL_CRON_SECRET repository secret (same value as the Vercel env var of the
+# same name on sprintguardai-api-uat).
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger health-check sweep
+        run: |
+          curl -sS -f -X POST \
+            https://sprintguardai-api-uat.vercel.app/api/v1/internal/integrations/health-check-sweep \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_CRON_SECRET }}"

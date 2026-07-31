@@ -22,6 +22,9 @@ export default () => ({
   credentialVault: {
     encryptionKey: process.env.CREDENTIAL_ENCRYPTION_KEY,
   },
+  internal: {
+    cronSecret: process.env.INTERNAL_CRON_SECRET,
+  },
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     openAiApiKey: process.env.OPENAI_API_KEY,

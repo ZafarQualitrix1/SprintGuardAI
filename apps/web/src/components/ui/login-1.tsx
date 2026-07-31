@@ -14,9 +14,13 @@ export interface AppInputProps extends React.InputHTMLAttributes<HTMLInputElemen
 }
 
 export const AppInput = React.forwardRef<HTMLInputElement, AppInputProps>(
-  ({ label, icon, error, className, ...rest }, ref) => {
+  ({ label, icon, error, className, id, ...rest }, ref) => {
     const [mousePosition, setMousePosition] = React.useState({ x: 0, y: 0 });
     const [isHovering, setIsHovering] = React.useState(false);
+    // react-hook-form's register() supplies `name` but not `id` -- fall back to it so the
+    // <label> stays associated with its input (accessibility: click-to-focus, screen readers).
+    const generatedId = React.useId();
+    const inputId = id ?? rest.name ?? generatedId;
 
     const handleMouseMove = (e: React.MouseEvent<HTMLInputElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -26,11 +30,14 @@ export const AppInput = React.forwardRef<HTMLInputElement, AppInputProps>(
     return (
       <div className="relative w-full min-w-[200px]">
         {label ? (
-          <label className="mb-2 block text-sm text-[var(--color-text-primary)]">{label}</label>
+          <label htmlFor={inputId} className="mb-2 block text-sm text-[var(--color-text-primary)]">
+            {label}
+          </label>
         ) : null}
         <div className="relative w-full">
           <input
             ref={ref}
+            id={inputId}
             className={cn(
               'peer relative z-10 h-12 w-full rounded-md border-2 border-[var(--color-border)] bg-[var(--color-surface)] px-4 font-light text-[var(--color-heading)] outline-none drop-shadow-sm transition-all duration-200 ease-in-out placeholder:font-normal placeholder:text-[var(--color-text-secondary)] focus:bg-[var(--color-bg)]',
               icon ? 'pr-10' : '',

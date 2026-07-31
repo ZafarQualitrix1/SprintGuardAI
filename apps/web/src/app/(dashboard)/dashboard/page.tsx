@@ -1,16 +1,15 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { AlertCircle, FolderKanban, Rocket, ShieldAlert, ShieldCheck, TrendingUp } from 'lucide-react';
-import Link from 'next/link';
+import { AlertCircle, Rocket, ShieldAlert, ShieldCheck, TrendingUp } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
-import { EmptyState } from '@/components/layout/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { SummaryCard } from '@/features/analytics/components/summary-card';
 import { VelocityTrendChart } from '@/features/analytics/components/velocity-trend-chart';
 import { useDashboardSummary } from '@/features/analytics/api';
+import { ConnectionsGrid } from '@/features/integration/components';
 import { useAuthStore } from '@/stores/auth-store';
 
 const cardContainer = {
@@ -78,22 +77,10 @@ export default function DashboardPage() {
         ))}
       </motion.div>
 
-      {!isLoading && !isError && data?.projectsCount === 0 ? (
-        <Card className="mt-4">
-          <CardContent className="pt-6">
-            <EmptyState
-              icon={FolderKanban}
-              title="No projects yet"
-              description="Create a project and import your first sprint to start seeing coverage, risk, and release readiness data here."
-              action={
-                <Button asChild>
-                  <Link href={'/dashboard/sprints/upload' as never}>Import a sprint</Link>
-                </Button>
-              }
-            />
-          </CardContent>
-        </Card>
-      ) : null}
+      <div className="mt-4 space-y-2">
+        <h2 className="text-lg font-semibold tracking-tight">Jira Workspaces</h2>
+        <ConnectionsGrid />
+      </div>
 
       <Card className="mt-4">
         <CardHeader>

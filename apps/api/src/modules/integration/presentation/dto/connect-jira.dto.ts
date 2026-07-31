@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsUrl, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsEmail, IsOptional, IsString, IsUrl, MinLength } from 'class-validator';
 
 export class ConnectJiraDto {
   @ApiProperty({ example: 'Acme Jira' })
@@ -19,4 +19,9 @@ export class ConnectJiraDto {
   @IsString()
   @MinLength(10)
   apiToken!: string;
+
+  @ApiPropertyOptional({ description: 'Make this the default workspace (always true for the first connection)' })
+  @IsOptional()
+  @IsBoolean()
+  isDefault?: boolean;
 }

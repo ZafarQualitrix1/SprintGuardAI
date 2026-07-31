@@ -20,6 +20,11 @@ export const envSchema = z.object({
 
   CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
 
+  // Guards the internal health-check sweep endpoint (InternalSecretGuard) -- optional so unrelated
+  // boots don't hard-fail if unset; the guard itself rejects clearly if the endpoint is hit while
+  // this is unconfigured.
+  INTERNAL_CRON_SECRET: z.string().min(16).optional(),
+
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),

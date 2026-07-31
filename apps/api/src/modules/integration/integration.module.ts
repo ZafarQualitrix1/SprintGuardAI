@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { IntegrationController } from './presentation/integration.controller';
 import { IntegrationsController } from './presentation/integrations.controller';
+import { InternalIntegrationsController } from './presentation/internal-integrations.controller';
 
 import { INTEGRATION_COMMAND_HANDLERS } from './application/commands';
 import { INTEGRATION_QUERY_HANDLERS } from './application/queries';
@@ -9,6 +10,7 @@ import { INTEGRATION_CONNECTORS } from './application/ports/integration-connecto
 import { INTEGRATION_CONNECTION_REPOSITORY } from './domain/repositories/integration-connection.repository.interface';
 
 import { AesCredentialVaultService } from './infrastructure/services/aes-credential-vault.service';
+import { AuditLogService } from './infrastructure/services/audit-log.service';
 import { JiraConnectorService } from './infrastructure/connectors/jira-connector.service';
 import { PrismaIntegrationConnectionRepository } from './infrastructure/repositories/prisma-integration-connection.repository';
 
@@ -17,11 +19,12 @@ import { PrismaIntegrationConnectionRepository } from './infrastructure/reposito
 // Jira is the reference connector implementation; Linear and others register the same way --
 // implement IIntegrationConnector, add to the INTEGRATION_CONNECTORS factory below.
 @Module({
-  controllers: [IntegrationController, IntegrationsController],
+  controllers: [IntegrationController, IntegrationsController, InternalIntegrationsController],
   providers: [
     ...INTEGRATION_COMMAND_HANDLERS,
     ...INTEGRATION_QUERY_HANDLERS,
     JiraConnectorService,
+    AuditLogService,
     { provide: CREDENTIAL_VAULT, useClass: AesCredentialVaultService },
     { provide: INTEGRATION_CONNECTION_REPOSITORY, useClass: PrismaIntegrationConnectionRepository },
     {

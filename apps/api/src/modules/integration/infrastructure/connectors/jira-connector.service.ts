@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import {
   ConnectorCredentials,
+  ExternalActiveSprintPayload,
+  ExternalBoardPayload,
+  ExternalProjectPayload,
   ExternalSprintPayload,
   ExternalStoryPayload,
   IIntegrationConnector,
@@ -27,6 +30,31 @@ interface JiraSprintResponse {
 
 interface JiraBoardSprintsResponse {
   values: JiraSprintResponse[];
+}
+
+interface JiraProjectResponse {
+  key: string;
+  name: string;
+  avatarUrls?: { '48x48'?: string };
+  lead?: { displayName?: string };
+}
+
+interface JiraProjectSearchResponse {
+  startAt: number;
+  maxResults: number;
+  total: number;
+  isLast: boolean;
+  values: JiraProjectResponse[];
+}
+
+interface JiraBoardResponse {
+  id: number;
+  name: string;
+  type: string;
+}
+
+interface JiraBoardSearchResponse {
+  values: JiraBoardResponse[];
 }
 
 interface JiraAdfNode {
@@ -59,6 +87,7 @@ interface JiraIssueSearchResponse {
 
 const MAX_ISSUES = 500;
 const PAGE_SIZE = 100;
+const PROJECT_PAGE_SIZE = 50;
 
 // Node's global `fetch`/`Response` ambient types resolve inconsistently across build
 // environments depending on which `@types/node` copy a pnpm install happens to hoist -- this
@@ -118,7 +147,7 @@ export class JiraConnectorService implements IIntegrationConnector {
   private async resolveSprintId(
     reference: string,
     jiraConfig: JiraConfig,
-    headers: Record<string, string>,
+    credentials: JiraCredentials,
   ): Promise<string> {
     try {
       return parseJiraSprintReference(reference);
@@ -128,24 +157,104 @@ export class JiraConnectorService implements IIntegrationConnector {
         throw error;
       }
 
-      const response = (await fetch(
-        `${jiraConfig.siteUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future`,
-        { headers },
-      )) as unknown as FetchResponse;
-      if (!response.ok) {
-        throw new BadRequestException(
-          `Could not look up sprints for Jira board ${boardId} (HTTP ${response.status}).`,
-        );
-      }
-      const { values } = (await response.json()) as JiraBoardSprintsResponse;
-      const sprint = values.find((s) => s.state === 'active') ?? values[0];
+      const sprints = await this.fetchActiveSprints(
+        String(boardId),
+        credentials,
+        jiraConfig as unknown as Record<string, unknown>,
+      );
+      const sprint = sprints.find((s) => s.state === 'active') ?? sprints[0];
       if (!sprint) {
         throw new BadRequestException(
           `Board ${boardId} has no active or upcoming sprint. Paste the numeric sprint id or a URL containing ?sprintId=... instead.`,
         );
       }
-      return String(sprint.id);
+      return sprint.externalId;
     }
+  }
+
+  async fetchProjects(
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalProjectPayload[]> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const projects: ExternalProjectPayload[] = [];
+    let startAt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const response = (await fetch(
+        `${jiraConfig.siteUrl}/rest/api/3/project/search?startAt=${startAt}&maxResults=${PROJECT_PAGE_SIZE}`,
+        { headers },
+      )) as unknown as FetchResponse;
+      if (!response.ok) {
+        throw new BadRequestException(`Could not list Jira projects (HTTP ${response.status}).`);
+      }
+      const page = (await response.json()) as JiraProjectSearchResponse;
+
+      projects.push(
+        ...page.values.map((project): ExternalProjectPayload => ({
+          externalKey: project.key,
+          name: project.name,
+          avatarUrl: project.avatarUrls?.['48x48'] ?? null,
+          lead: project.lead?.displayName ?? null,
+        })),
+      );
+
+      startAt += page.values.length;
+      if (page.isLast || page.values.length === 0) {
+        break;
+      }
+    }
+
+    return projects;
+  }
+
+  async fetchBoards(
+    projectKey: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalBoardPayload[]> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(projectKey)}`,
+      { headers },
+    )) as unknown as FetchResponse;
+    if (!response.ok) {
+      throw new BadRequestException(`Could not list Jira boards for project ${projectKey} (HTTP ${response.status}).`);
+    }
+    const { values } = (await response.json()) as JiraBoardSearchResponse;
+    return values.map((board): ExternalBoardPayload => ({ id: String(board.id), name: board.name, type: board.type }));
+  }
+
+  async fetchActiveSprints(
+    boardId: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalActiveSprintPayload[]> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/agile/1.0/board/${boardId}/sprint?state=active,future`,
+      { headers },
+    )) as unknown as FetchResponse;
+    if (!response.ok) {
+      throw new BadRequestException(`Could not look up sprints for Jira board ${boardId} (HTTP ${response.status}).`);
+    }
+    const { values } = (await response.json()) as JiraBoardSprintsResponse;
+    return values.map((sprint): ExternalActiveSprintPayload => ({
+      externalId: String(sprint.id),
+      name: sprint.name,
+      state: sprint.state ?? 'unknown',
+      startDate: toIsoDate(sprint.startDate),
+      endDate: toIsoDate(sprint.endDate),
+    }));
   }
 
   async fetchSprint(
@@ -156,7 +265,7 @@ export class JiraConnectorService implements IIntegrationConnector {
     const jiraCredentials = credentials as JiraCredentials;
     const jiraConfig = config as unknown as JiraConfig;
     const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
-    const sprintId = await this.resolveSprintId(reference, jiraConfig, headers);
+    const sprintId = await this.resolveSprintId(reference, jiraConfig, jiraCredentials);
 
     const sprintResponse = (await fetch(`${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}`, {
       headers,

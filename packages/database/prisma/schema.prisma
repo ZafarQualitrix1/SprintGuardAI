@@ -955,23 +955,68 @@ enum ConnectionStatus {
   DISCONNECTED
 }
 
+// Distinct from ConnectionStatus (which tracks the connection's lifecycle/auth state):
+// HealthStatus tracks the outcome of the most recent liveness check (manual "Test Connection"
+// or the internal health-check sweep), independent of whether the connection is currently
+// CONNECTED/ERROR/DISCONNECTED.
+enum HealthStatus {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  UNKNOWN
+}
+
 model IntegrationConnection {
   id                    String           @id @default(cuid())
   organizationId        String
   connectorId           String
   name                  String
+  siteUrl               String // denormalized from config.siteUrl for display/dedup without decrypting
+  email                 String? // denormalized display copy of the connected account's email, NOT the secret --
+  // nullable because pre-existing rows (connected before this column existed) have no plaintext
+  // source to backfill it from (only credentialsEncrypted has it, inside the encrypted blob);
+  // always populated for connections created after this migration.
   credentialsEncrypted  String // AES-256-GCM envelope-encrypted blob
   status                ConnectionStatus @default(PENDING)
+  isDefault             Boolean          @default(false)
+  healthStatus          HealthStatus     @default(UNKNOWN)
+  lastHealthCheckAt     DateTime?
   lastSyncedAt          DateTime?
   config                Json?
   createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  connector    Connector      @relation(fields: [connectorId], references: [id])
+  organization  Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connector     Connector            @relation(fields: [connectorId], references: [id])
   webhookEvents WebhookEvent[]
   syncJobs      SyncJob[]
+  projects      IntegrationProject[]
 
+  // Prevents the same org from connecting the same Jira site under the same account twice.
+  // Legacy rows with email=NULL are exempt from this (Postgres treats NULL as distinct in
+  // unique indexes), which is fine -- true duplicate-prevention only matters going forward.
+  @@unique([organizationId, connectorId, siteUrl, email])
   @@index([organizationId])
+}
+
+// Cache of the Jira (or future connector) projects a connection can see -- populated by the
+// import wizard's "load projects" step and by "Sync Now", never authoritative. The real
+// imported-sprint data lives in the sprint module's own Project/Sprint/Story models, which this
+// table is never joined against.
+model IntegrationProject {
+  id           String   @id @default(cuid())
+  connectionId String
+  externalKey  String
+  name         String
+  avatarUrl    String?
+  lead         String?
+  isArchived   Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+
+  connection IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalKey])
+  @@index([connectionId])
 }
 
 enum WebhookEventStatus {
