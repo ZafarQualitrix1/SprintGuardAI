@@ -38,4 +38,12 @@ describe('useAuthStore', () => {
     expect(state.accessToken).toBeNull();
     expect(state.user).toBeNull();
   });
+
+  it('setHasHydrated flips the hydration flag consumers gate their redirect logic on', () => {
+    useAuthStore.getState().setHasHydrated(false);
+    expect(useAuthStore.getState().hasHydrated).toBe(false);
+
+    useAuthStore.getState().setHasHydrated(true);
+    expect(useAuthStore.getState().hasHydrated).toBe(true);
+  });
 });

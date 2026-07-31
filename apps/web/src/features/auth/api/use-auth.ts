@@ -39,14 +39,15 @@ export function useLogout() {
 
 // Backs the (dashboard) session guard: treats a 401 as "no session" rather than an error to
 // surface, since an expired/missing access token is the expected steady state for a logged-out
-// visitor hitting a protected route.
-export function useCurrentUser() {
+// visitor hitting a protected route. `enabled` additionally lets SessionGuard hold this query off
+// until the persisted auth store has hydrated, so it never fires with a not-yet-restored token.
+export function useCurrentUser(options?: { enabled?: boolean }) {
   const accessToken = useAuthStore((state) => state.accessToken);
 
   return useQuery({
     queryKey: ['auth', 'me'],
     queryFn: authApi.me,
-    enabled: Boolean(accessToken),
+    enabled: Boolean(accessToken) && (options?.enabled ?? true),
     retry: (failureCount, error) => error instanceof ApiError && error.statusCode !== 401 && failureCount < 1,
   });
 }
