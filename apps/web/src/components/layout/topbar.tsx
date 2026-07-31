@@ -34,7 +34,7 @@ export function Topbar() {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4">
+    <header className="relative z-10 flex h-14 items-center justify-between border-b bg-background/85 backdrop-blur-md px-4">
       <div className="flex items-center gap-4">
         {user ? (
           <span className="text-sm font-medium text-muted-foreground">{user.organizationName}</span>

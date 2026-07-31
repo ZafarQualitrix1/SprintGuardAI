@@ -10,7 +10,7 @@ export function Sidebar() {
   const BrandIcon = brand.icon;
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r bg-card md:flex md:flex-col">
+    <aside className="relative z-10 hidden w-64 shrink-0 border-r bg-card/85 backdrop-blur-md md:flex md:flex-col">
       <div className="flex h-14 items-center gap-2 border-b px-4">
         <BrandIcon className="h-5 w-5 text-primary" />
         <span className="font-semibold">{brand.name}</span>
