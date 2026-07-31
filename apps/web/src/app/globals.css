@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Always-dark palette for the login/register split-panel (components/auth/auth-split-shell.tsx,
+   components/ui/login-1.tsx) -- intentionally not theme-conditional like the --background/etc.
+   variables below, since the auth screens keep one fixed look regardless of the app's light/dark
+   mode toggle. Distinct names from the shadcn tokens above avoid any collision. */
+:root {
+  --color-bg: #101214;
+  --color-surface: #161a1d;
+  --color-muted-surface: #1d2125;
+  --color-border: #2c333a;
+  --color-text-secondary: #596773;
+  --color-text-primary: #c7d1db;
+  --color-heading: #dee4ea;
+  --color-bg-2: #c7d1db;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

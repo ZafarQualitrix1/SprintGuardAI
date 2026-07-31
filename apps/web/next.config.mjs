@@ -3,6 +3,9 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@sprintguard/shared'],
   typedRoutes: true,
+  images: {
+    remotePatterns: [{ protocol: 'https', hostname: 'images.unsplash.com' }],
+  },
   // Self-contained server bundle (.next/standalone) for the production Docker image
   // (apps/web/Dockerfile) -- no full node_modules copy needed at runtime. Gated behind
   // DOCKER_BUILD (set by the Dockerfile only) because Next's output-tracing step symlinks into
