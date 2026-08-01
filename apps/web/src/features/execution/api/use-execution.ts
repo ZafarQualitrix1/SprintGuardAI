@@ -8,6 +8,7 @@ export function useExecutions(sprintId: string) {
   return useQuery({
     queryKey: ['execution', sprintId],
     queryFn: () => executionApi.listBySprint(sprintId),
+    enabled: Boolean(sprintId),
   });
 }
 

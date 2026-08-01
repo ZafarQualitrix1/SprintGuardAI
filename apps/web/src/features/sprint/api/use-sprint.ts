@@ -27,6 +27,7 @@ export function useSprint(sprintId: string) {
   return useQuery({
     queryKey: ['sprint', 'detail', sprintId],
     queryFn: () => sprintsApi.get(sprintId),
+    enabled: Boolean(sprintId),
   });
 }
 

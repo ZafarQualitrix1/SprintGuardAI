@@ -7,6 +7,7 @@ export function useCoverage(sprintId: string) {
   return useQuery({
     queryKey: ['coverage', sprintId],
     queryFn: () => coverageApi.get(sprintId),
+    enabled: Boolean(sprintId),
   });
 }
 

@@ -7,6 +7,7 @@ export function useReleaseReport(sprintId: string) {
   return useQuery({
     queryKey: ['release', sprintId],
     queryFn: () => releaseApi.get(sprintId),
+    enabled: Boolean(sprintId),
   });
 }
 

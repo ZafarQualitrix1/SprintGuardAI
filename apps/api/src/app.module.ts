@@ -16,6 +16,7 @@ import { HealthModule } from './health/health.module';
 // Bounded context modules (Solution Architecture §6). Each implements Clean Architecture layering
 // internally (docs/architecture/03-backend-folder-structure.md); this is the composition root.
 import { IAMModule } from './modules/iam/iam.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { RequirementIntelligenceModule } from './modules/requirement-intelligence/requirement-intelligence.module';
 import { TestIntelligenceModule } from './modules/test-intelligence/test-intelligence.module';
@@ -68,6 +69,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     HealthModule,
 
     IAMModule,
+    AnalyticsModule,
     SprintModule,
     RequirementIntelligenceModule,
     TestIntelligenceModule,
