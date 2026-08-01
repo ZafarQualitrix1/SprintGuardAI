@@ -8,24 +8,25 @@ const DEFAULT_MAX_TOKENS = 4096;
 @Injectable()
 export class ClaudeProviderService implements IAiProvider {
   readonly key = 'anthropic';
-  private client: Anthropic | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
-  private getClient(): Anthropic {
-    if (this.client) return this.client;
-    const apiKey = this.configService.get<string>('ai.anthropicApiKey');
-    if (!apiKey) {
+  // Built per-call, not cached -- request.apiKey may differ per org (see GeminiProviderService).
+  private getClient(apiKey?: string): Anthropic {
+    const resolvedKey = apiKey ?? this.configService.get<string>('ai.anthropicApiKey');
+    if (!resolvedKey) {
       throw new InternalServerErrorException('ANTHROPIC_API_KEY is not configured');
     }
-    this.client = new Anthropic({ apiKey });
-    return this.client;
+    return new Anthropic({ apiKey: resolvedKey });
   }
 
   async complete(request: AiCompletionRequest, model: string): Promise<AiCompletionResult> {
-    const response = await this.getClient().messages.create({
+    const response = await this.getClient(request.apiKey).messages.create({
       model,
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
+      temperature: request.temperature,
+      top_p: request.topP,
+      top_k: request.topK,
       system: request.systemPrompt,
       messages: [{ role: 'user', content: request.prompt }],
     });

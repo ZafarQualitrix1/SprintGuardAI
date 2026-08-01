@@ -3,7 +3,9 @@ export const AI_RESPONSE_REPOSITORY = Symbol('IAiResponseRepository');
 export interface CreateAiResponseInput {
   agentRunId: string;
   promptId: string;
-  modelRegistryEntryId: string;
+  // Undefined when the model came from a ModuleAiConfig override rather than the ModelRegistry
+  // lookup (AI Settings §4/§17) -- the override model may not have a registry entry at all.
+  modelRegistryEntryId?: string;
   promptVersion: string;
   promptHash: string;
   rawResponse: unknown;
@@ -11,6 +13,7 @@ export interface CreateAiResponseInput {
   confidenceScore: number;
   tokensUsed: number;
   latencyMs: number;
+  costUsd?: number;
 }
 
 export interface IAiResponseRepository {

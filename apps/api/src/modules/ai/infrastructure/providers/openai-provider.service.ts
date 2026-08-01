@@ -8,24 +8,24 @@ const DEFAULT_MAX_TOKENS = 4096;
 @Injectable()
 export class OpenAiProviderService implements IAiProvider {
   readonly key = 'openai';
-  private client: OpenAI | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
-  private getClient(): OpenAI {
-    if (this.client) return this.client;
-    const apiKey = this.configService.get<string>('ai.openAiApiKey');
-    if (!apiKey) {
+  // Built per-call, not cached -- request.apiKey may differ per org (see GeminiProviderService).
+  private getClient(apiKey?: string): OpenAI {
+    const resolvedKey = apiKey ?? this.configService.get<string>('ai.openAiApiKey');
+    if (!resolvedKey) {
       throw new InternalServerErrorException('OPENAI_API_KEY is not configured');
     }
-    this.client = new OpenAI({ apiKey });
-    return this.client;
+    return new OpenAI({ apiKey: resolvedKey });
   }
 
   async complete(request: AiCompletionRequest, model: string): Promise<AiCompletionResult> {
-    const response = await this.getClient().chat.completions.create({
+    const response = await this.getClient(request.apiKey).chat.completions.create({
       model,
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
+      temperature: request.temperature,
+      top_p: request.topP,
       messages: [
         { role: 'system', content: request.systemPrompt },
         { role: 'user', content: request.prompt },

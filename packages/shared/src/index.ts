@@ -9,3 +9,4 @@ export * from './schemas/test-intelligence';
 export * from './schemas/coverage';
 export * from './schemas/execution';
 export * from './schemas/release';
+export * from './schemas/ai-settings';

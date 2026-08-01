@@ -3,6 +3,9 @@ import {
   ConnectorCredentials,
   ExternalActiveSprintPayload,
   ExternalBoardPayload,
+  ExternalIssueAttachmentPayload,
+  ExternalIssueCommentPayload,
+  ExternalIssueDetailPayload,
   ExternalProjectPayload,
   ExternalSprintPayload,
   ExternalStoryPayload,
@@ -63,6 +66,51 @@ interface JiraAdfNode {
   content?: JiraAdfNode[];
 }
 
+interface JiraFieldMeta {
+  id: string;
+  name: string;
+  custom: boolean;
+}
+
+interface JiraIssueDetailFields {
+  summary: string;
+  description?: string | JiraAdfNode | null;
+  status?: { name?: string };
+  assignee?: { displayName?: string } | null;
+  reporter?: { displayName?: string } | null;
+  priority?: { name?: string } | null;
+  labels?: string[];
+  components?: { name: string }[];
+  duedate?: string | null;
+  created?: string;
+  updated?: string;
+  environment?: string | JiraAdfNode | null;
+  parent?: { key: string; fields?: { summary?: string; issuetype?: { name?: string } } };
+  comment?: { comments: JiraCommentResponse[] };
+  attachment?: JiraAttachmentResponse[];
+  [customFieldOrStandardKey: string]: unknown;
+}
+
+interface JiraCommentResponse {
+  author?: { displayName?: string };
+  body?: string | JiraAdfNode;
+  created?: string;
+}
+
+interface JiraAttachmentResponse {
+  filename: string;
+  mimeType?: string;
+  size?: number;
+  content?: string;
+}
+
+interface JiraIssueDetailResponse {
+  key: string;
+  fields: JiraIssueDetailFields;
+}
+
+const MAX_COMMENTS = 50;
+
 interface JiraIssue {
   id: string;
   key: string;
@@ -111,6 +159,46 @@ function extractPlainText(node: string | JiraAdfNode | null | undefined): string
   return parts.length > 0 ? parts.join(' ') : null;
 }
 
+// Unlike extractPlainText (a lossy flat join kept as-is for fetchSprint's existing contract), this
+// preserves paragraph breaks and bullet prefixes so an AI prompt can still tell a list from a
+// sentence -- still discards marks/links, just keeps block-level structure.
+const BLOCK_NODE_TYPES = new Set(['paragraph', 'heading', 'codeBlock', 'blockquote']);
+
+function adfToStructuredText(node: string | JiraAdfNode | null | undefined): string | null {
+  if (!node) return null;
+  if (typeof node === 'string') return node;
+
+  const lines: string[] = [];
+  let current = '';
+
+  const flush = () => {
+    if (current.trim()) lines.push(current.trim());
+    current = '';
+  };
+
+  const walk = (n: JiraAdfNode, listPrefix: string | null) => {
+    if (n.type === 'listItem') {
+      flush();
+      current = listPrefix ?? '- ';
+    }
+    if (n.text) current += n.text;
+    if (n.type && BLOCK_NODE_TYPES.has(n.type) && current) {
+      // paragraph/heading boundaries become their own line
+    }
+    n.content?.forEach((child) => {
+      const childPrefix = n.type === 'bulletList' || n.type === 'orderedList' ? '- ' : listPrefix;
+      walk(child, childPrefix);
+    });
+    if (n.type && BLOCK_NODE_TYPES.has(n.type)) {
+      flush();
+    }
+  };
+
+  walk(node, null);
+  flush();
+  return lines.length > 0 ? lines.join('\n') : null;
+}
+
 function toIsoDate(value: string | undefined): Date | null {
   if (!value) return null;
   const date = new Date(value);
@@ -120,6 +208,10 @@ function toIsoDate(value: string | undefined): Date | null {
 @Injectable()
 export class JiraConnectorService implements IIntegrationConnector {
   readonly key = 'jira';
+
+  // Per-site field name -> id resolution cache (Jira's field metadata is effectively static per
+  // instance). Bounded by the number of distinct Jira sites ever connected, not per-request.
+  private readonly fieldIdCache = new Map<string, { acceptanceCriteriaFieldId: string | null }>();
 
   private authHeader(credentials: JiraCredentials): string {
     const token = Buffer.from(`${credentials.email}:${credentials.apiToken}`).toString('base64');
@@ -313,6 +405,125 @@ export class JiraConnectorService implements IIntegrationConnector {
       startDate: toIsoDate(sprint.startDate),
       endDate: toIsoDate(sprint.endDate),
       stories,
+    };
+  }
+
+  // Best-effort: if the field-metadata lookup fails for any reason, callers just get no
+  // acceptance-criteria custom field match, not a hard failure of the whole issue fetch.
+  private async resolveAcceptanceCriteriaFieldId(
+    jiraConfig: JiraConfig,
+    headers: Record<string, string>,
+  ): Promise<string | null> {
+    const cached = this.fieldIdCache.get(jiraConfig.siteUrl);
+    if (cached) {
+      return cached.acceptanceCriteriaFieldId;
+    }
+    try {
+      const response = (await fetch(`${jiraConfig.siteUrl}/rest/api/3/field`, { headers })) as unknown as FetchResponse;
+      if (!response.ok) {
+        this.fieldIdCache.set(jiraConfig.siteUrl, { acceptanceCriteriaFieldId: null });
+        return null;
+      }
+      const fields = (await response.json()) as JiraFieldMeta[];
+      const match = fields.find((field) => /acceptance criteria/i.test(field.name));
+      const acceptanceCriteriaFieldId = match?.id ?? null;
+      this.fieldIdCache.set(jiraConfig.siteUrl, { acceptanceCriteriaFieldId });
+      return acceptanceCriteriaFieldId;
+    } catch {
+      this.fieldIdCache.set(jiraConfig.siteUrl, { acceptanceCriteriaFieldId: null });
+      return null;
+    }
+  }
+
+  // Heuristic fallback when the instance has no dedicated Acceptance Criteria field: Jira teams
+  // very commonly put it in the description under a "Acceptance Criteria" heading.
+  private extractAcceptanceCriteriaFromDescription(description: string | null): string | null {
+    if (!description) return null;
+    const match = description.match(/acceptance criteria[:\s]*\n([\s\S]*?)(?:\n\n|$)/i);
+    return match ? match[1].trim() || null : null;
+  }
+
+  async fetchIssueDetail(
+    externalId: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalIssueDetailPayload> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const acceptanceCriteriaFieldId = await this.resolveAcceptanceCriteriaFieldId(jiraConfig, headers);
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/api/3/issue/${encodeURIComponent(externalId)}?fields=*all`,
+      { headers },
+    )) as unknown as FetchResponse;
+    if (!response.ok) {
+      throw new BadRequestException(`Could not fetch Jira issue ${externalId} (HTTP ${response.status}).`);
+    }
+    const issue = (await response.json()) as JiraIssueDetailResponse;
+    const fields = issue.fields;
+
+    const description = adfToStructuredText(fields.description ?? null);
+    const acceptanceCriteriaRaw = acceptanceCriteriaFieldId ? fields[acceptanceCriteriaFieldId] : null;
+    const acceptanceCriteria =
+      adfToStructuredText((acceptanceCriteriaRaw as string | JiraAdfNode | null) ?? null) ??
+      this.extractAcceptanceCriteriaFromDescription(description);
+
+    const comments: ExternalIssueCommentPayload[] = (fields.comment?.comments ?? [])
+      .map((comment): ExternalIssueCommentPayload => ({
+        author: comment.author?.displayName ?? null,
+        body: adfToStructuredText(comment.body ?? null) ?? '',
+        createdAt: toIsoDate(comment.created),
+      }))
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
+      .slice(0, MAX_COMMENTS);
+
+    const attachments: ExternalIssueAttachmentPayload[] = (fields.attachment ?? []).map(
+      (attachment): ExternalIssueAttachmentPayload => ({
+        filename: attachment.filename,
+        mimeType: attachment.mimeType ?? null,
+        sizeBytes: attachment.size ?? null,
+        url: attachment.content ?? null,
+      }),
+    );
+
+    // Known keys already mapped above (plus Agile's default story-points field) are excluded from
+    // the passthrough bucket; every other populated customfield_* an org has configured still
+    // reaches the AI prompt, just without a friendly name.
+    const mappedKeys = new Set([
+      'summary', 'description', 'status', 'assignee', 'reporter', 'priority', 'labels', 'components',
+      'duedate', 'created', 'updated', 'environment', 'parent', 'comment', 'attachment',
+      'customfield_10016', acceptanceCriteriaFieldId,
+    ]);
+    const additionalCustomFields: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (key.startsWith('customfield_') && !mappedKeys.has(key) && value !== null && value !== undefined) {
+        additionalCustomFields[key] = value;
+      }
+    }
+
+    return {
+      externalId: issue.key,
+      title: fields.summary,
+      description,
+      acceptanceCriteria,
+      status: fields.status?.name ?? 'Unknown',
+      priority: fields.priority?.name ?? null,
+      assignee: fields.assignee?.displayName ?? null,
+      reporter: fields.reporter?.displayName ?? null,
+      labels: fields.labels ?? [],
+      components: (fields.components ?? []).map((component) => component.name),
+      epic: fields.parent?.fields?.issuetype?.name === 'Epic' ? (fields.parent.fields.summary ?? fields.parent.key) : null,
+      parent: fields.parent ? (fields.parent.fields?.summary ?? fields.parent.key) : null,
+      storyPoints: (fields.customfield_10016 as number | null) ?? null,
+      dueDate: fields.duedate ? toIsoDate(fields.duedate) : null,
+      createdAt: toIsoDate(fields.created),
+      updatedAt: toIsoDate(fields.updated),
+      environment: adfToStructuredText(fields.environment ?? null),
+      comments,
+      attachments,
+      additionalCustomFields,
     };
   }
 }

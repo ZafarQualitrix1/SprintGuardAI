@@ -33,7 +33,10 @@ export class PrismaAgentRunRepository implements IAgentRunRepository {
         output: input.output as Prisma.InputJsonValue | undefined,
         confidenceScore: input.confidenceScore,
         tokensUsed: input.tokensUsed,
+        costUsd: input.costUsd,
         error: input.error,
+        provider: input.provider,
+        model: input.model,
         completedAt: new Date(),
       },
     });

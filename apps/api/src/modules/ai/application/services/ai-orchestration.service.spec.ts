@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
 import { IAiProvider } from '../ports/ai-provider.port';
 import { IAgentRepository } from '../../domain/repositories/agent.repository.interface';
@@ -7,10 +6,11 @@ import { IAiPromptRepository } from '../../domain/repositories/ai-prompt.reposit
 import { IAiResponseRepository } from '../../domain/repositories/ai-response.repository.interface';
 import { IModelRegistryRepository } from '../../domain/repositories/model-registry.repository.interface';
 import { AiOrchestrationService } from './ai-orchestration.service';
+import { AiProviderConfigService } from './ai-provider-config.service';
 
 const outputSchema = z.object({ items: z.array(z.string()).min(1) });
 
-function buildService(provider: IAiProvider) {
+function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<string, unknown> = {}) {
   const agentRunRepository: jest.Mocked<IAgentRunRepository> = {
     start: jest.fn().mockResolvedValue({ id: 'run-1' }),
     complete: jest.fn().mockResolvedValue(undefined),
@@ -32,8 +32,12 @@ function buildService(provider: IAiProvider) {
   };
   const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
     findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'google', model: 'gemini-2.0-flash' }),
+    listAll: jest.fn().mockResolvedValue([]),
   };
-  const configService = { get: () => 'google' } as unknown as ConfigService;
+  const aiProviderConfigService = {
+    resolveEffectiveConfig: jest.fn().mockResolvedValue({ provider: 'google', ...resolvedConfigOverrides }),
+    resolveApiKey: jest.fn().mockResolvedValue(undefined),
+  } as unknown as jest.Mocked<AiProviderConfigService>;
 
   const service = new AiOrchestrationService(
     [provider],
@@ -42,10 +46,10 @@ function buildService(provider: IAiProvider) {
     promptRepository,
     responseRepository,
     modelRegistryRepository,
-    configService,
+    aiProviderConfigService,
   );
 
-  return { service, agentRunRepository, responseRepository };
+  return { service, agentRunRepository, responseRepository, aiProviderConfigService, modelRegistryRepository };
 }
 
 describe('AiOrchestrationService', () => {
@@ -66,6 +70,8 @@ describe('AiOrchestrationService', () => {
 
     expect(result.data).toEqual({ items: ['a', 'b'] });
     expect(result.confidenceScore).toBe(1);
+    expect(result.provider).toBe('google');
+    expect(result.model).toBe('gemini-2.0-flash');
     expect(provider.complete).toHaveBeenCalledTimes(1);
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'run-1', status: 'SUCCEEDED', confidenceScore: 1 }),
@@ -98,7 +104,7 @@ describe('AiOrchestrationService', () => {
     expect(provider.complete.mock.calls[1][0].prompt).toContain('Your previous response was invalid');
   });
 
-  it('flags the run for review and throws after exhausting retries', async () => {
+  it('flags the run for review and throws after exhausting retries when no fallback is configured', async () => {
     const provider: jest.Mocked<IAiProvider> = {
       key: 'google',
       complete: jest.fn().mockResolvedValue({ text: 'still not json', inputTokens: 1, outputTokens: 1 }),
@@ -117,6 +123,77 @@ describe('AiOrchestrationService', () => {
 
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW' }),
+    );
+  });
+
+  it('retries once against the configured fallback provider when the primary exhausts its retries', async () => {
+    const primaryProvider: jest.Mocked<IAiProvider> = {
+      key: 'google',
+      complete: jest.fn().mockResolvedValue({ text: 'still not json', inputTokens: 1, outputTokens: 1 }),
+    };
+    const fallbackProvider: jest.Mocked<IAiProvider> = {
+      key: 'anthropic',
+      complete: jest.fn().mockResolvedValue({ text: '{"items":["fallback-worked"]}', inputTokens: 4, outputTokens: 2 }),
+    };
+
+    const agentRunRepository: jest.Mocked<IAgentRunRepository> = {
+      start: jest.fn().mockResolvedValue({ id: 'run-1' }),
+      complete: jest.fn().mockResolvedValue(undefined),
+    };
+    const responseRepository: jest.Mocked<IAiResponseRepository> = {
+      create: jest.fn().mockResolvedValue({ id: 'response-1' }),
+    };
+    const promptRepository: jest.Mocked<IAiPromptRepository> = {
+      findActiveByCapability: jest.fn().mockResolvedValue({
+        id: 'prompt-1',
+        capability: 'test-capability',
+        version: 'v1',
+        template: 'Say hello to {{name}}',
+        templateHash: 'hash-1',
+      }),
+    };
+    const agentRepository: jest.Mocked<IAgentRepository> = {
+      findByKey: jest.fn().mockResolvedValue({ id: 'agent-1', key: 'test-agent' }),
+    };
+    const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
+      findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'google', model: 'gemini-2.0-flash' }),
+      listAll: jest.fn().mockResolvedValue([]),
+    };
+    const aiProviderConfigService = {
+      resolveEffectiveConfig: jest.fn().mockResolvedValue({
+        provider: 'google',
+        retryCount: 1,
+        fallbackProvider: 'anthropic',
+        fallbackModel: 'claude-sonnet-5',
+      }),
+      resolveApiKey: jest.fn().mockResolvedValue('fallback-key'),
+    } as unknown as jest.Mocked<AiProviderConfigService>;
+
+    const service = new AiOrchestrationService(
+      [primaryProvider, fallbackProvider],
+      agentRepository,
+      agentRunRepository,
+      promptRepository,
+      responseRepository,
+      modelRegistryRepository,
+      aiProviderConfigService,
+    );
+
+    const result = await service.execute({
+      capability: 'test-capability',
+      agentKey: 'test-agent',
+      organizationId: 'org-1',
+      variables: {},
+      outputSchema,
+    });
+
+    expect(result.data).toEqual({ items: ['fallback-worked'] });
+    expect(result.provider).toBe('anthropic');
+    expect(result.model).toBe('claude-sonnet-5');
+    expect(primaryProvider.complete).toHaveBeenCalledTimes(1);
+    expect(fallbackProvider.complete).toHaveBeenCalledTimes(1);
+    expect(agentRunRepository.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'SUCCEEDED', provider: 'anthropic', model: 'claude-sonnet-5' }),
     );
   });
 });

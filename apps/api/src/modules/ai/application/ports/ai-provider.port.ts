@@ -2,6 +2,13 @@ export interface AiCompletionRequest {
   systemPrompt: string;
   prompt: string;
   maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  // Resolved credential (DB-configured, decrypted) for this call's organization/provider. When
+  // omitted, the provider adapter falls back to its env-var-configured key (Solution Architecture
+  // §16.1) -- keeps every pre-existing env-var-only deployment working unmigrated.
+  apiKey?: string;
 }
 
 export interface AiCompletionResult {

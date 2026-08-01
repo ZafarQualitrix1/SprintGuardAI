@@ -48,6 +48,47 @@ export interface ExternalActiveSprintPayload {
   endDate: Date | null;
 }
 
+// Full single-issue detail for deep AI analysis (Requirement Intelligence "Analyze story"), as
+// opposed to ExternalStoryPayload's thin sprint-import subset. Attachments are metadata only --
+// no binary content is fetched or sent to the AI. additionalCustomFields carries through any
+// populated customfield_* the connector didn't map to a named field above, so org-specific Jira
+// setups aren't silently dropped.
+export interface ExternalIssueCommentPayload {
+  author: string | null;
+  body: string;
+  createdAt: Date | null;
+}
+
+export interface ExternalIssueAttachmentPayload {
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  url: string | null;
+}
+
+export interface ExternalIssueDetailPayload {
+  externalId: string;
+  title: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  status: string;
+  priority: string | null;
+  assignee: string | null;
+  reporter: string | null;
+  labels: string[];
+  components: string[];
+  epic: string | null;
+  parent: string | null;
+  storyPoints: number | null;
+  dueDate: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  environment: string | null;
+  comments: ExternalIssueCommentPayload[];
+  attachments: ExternalIssueAttachmentPayload[];
+  additionalCustomFields: Record<string, unknown>;
+}
+
 // Implemented once per external system (Jira first -- Solution Architecture §18's reference
 // implementation -- Linear next, behind this same port). A "Connector Registry" in the
 // architecture sense is, for this MVP scope, the simple key->instance map built in
@@ -76,6 +117,12 @@ export interface IIntegrationConnector {
     credentials: ConnectorCredentials,
     config: Record<string, unknown>,
   ): Promise<ExternalActiveSprintPayload[]>;
+  /** Full single-issue detail for deep AI analysis -- Requirement Intelligence "Analyze story". */
+  fetchIssueDetail(
+    externalId: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalIssueDetailPayload>;
 }
 
 // Multi-provider injection token: integration.module.ts binds this to an array of every

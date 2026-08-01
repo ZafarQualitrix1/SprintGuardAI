@@ -6,24 +6,39 @@ import { AiCompletionRequest, AiCompletionResult, IAiProvider } from '../../appl
 @Injectable()
 export class GeminiProviderService implements IAiProvider {
   readonly key = 'google';
-  private client: GoogleGenerativeAI | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
-  private getClient(): GoogleGenerativeAI {
-    if (this.client) return this.client;
-    const apiKey = this.configService.get<string>('ai.googleApiKey');
-    if (!apiKey) {
+  // Built per-call rather than cached -- request.apiKey may be a different org's DB-configured
+  // key on each call, so a single cached singleton client would leak credentials across orgs.
+  private getClient(apiKey?: string): GoogleGenerativeAI {
+    const resolvedKey = apiKey ?? this.configService.get<string>('ai.googleApiKey');
+    if (!resolvedKey) {
       throw new InternalServerErrorException('GOOGLE_GENERATIVE_AI_API_KEY is not configured');
     }
-    this.client = new GoogleGenerativeAI(apiKey);
-    return this.client;
+    return new GoogleGenerativeAI(resolvedKey);
   }
 
   async complete(request: AiCompletionRequest, model: string): Promise<AiCompletionResult> {
-    const generativeModel = this.getClient().getGenerativeModel({
+    const hasGenerationConfig =
+      request.temperature !== undefined ||
+      request.topP !== undefined ||
+      request.topK !== undefined ||
+      request.maxTokens !== undefined;
+
+    const generativeModel = this.getClient(request.apiKey).getGenerativeModel({
       model,
       systemInstruction: request.systemPrompt,
+      ...(hasGenerationConfig
+        ? {
+            generationConfig: {
+              temperature: request.temperature,
+              topP: request.topP,
+              topK: request.topK,
+              maxOutputTokens: request.maxTokens,
+            },
+          }
+        : {}),
     });
 
     const result = await generativeModel.generateContent(request.prompt);

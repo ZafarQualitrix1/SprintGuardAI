@@ -17,7 +17,12 @@ export interface CompleteAgentRunInput {
   output?: unknown;
   confidenceScore?: number;
   tokensUsed?: number;
+  costUsd?: number;
   error?: string;
+  // Set only when a fallback provider (AI Settings §12) actually served the run, so the recorded
+  // provider/model reflects reality rather than the primary provider chosen at start().
+  provider?: string;
+  model?: string;
 }
 
 export interface IAgentRunRepository {

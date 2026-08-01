@@ -23,6 +23,7 @@ export class PrismaSprintRepository implements ISprintRepository {
           status: 'ACTIVE',
           startDate: input.startDate,
           endDate: input.endDate,
+          sourceConnectionId: input.sourceConnectionId ?? null,
         },
       });
 

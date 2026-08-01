@@ -22,6 +22,8 @@ export interface CreateSprintWithStoriesInput {
   startDate: Date | null;
   endDate: Date | null;
   stories: CreateStoryInput[];
+  /** Jira (or other connector) connection this sprint was imported through, if any. */
+  sourceConnectionId?: string | null;
 }
 
 export interface ISprintRepository {

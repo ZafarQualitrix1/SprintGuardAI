@@ -4,6 +4,9 @@ export interface StoryReadModel {
   id: string;
   title: string;
   description: string | null;
+  externalId: string | null;
+  sprintId: string;
+  sourceConnectionId: string | null;
 }
 
 // Read-only access to the Story record owned by the `sprint` module's Sprint aggregate

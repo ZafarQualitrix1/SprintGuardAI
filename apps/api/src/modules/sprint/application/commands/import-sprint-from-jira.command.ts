@@ -84,6 +84,7 @@ export class ImportSprintFromJiraHandler
       startDate: externalSprint.startDate,
       endDate: externalSprint.endDate,
       stories,
+      sourceConnectionId: command.connectionId,
     });
 
     this.eventBus.publish(

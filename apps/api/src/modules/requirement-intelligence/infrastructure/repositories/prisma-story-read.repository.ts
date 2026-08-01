@@ -9,8 +9,25 @@ export class PrismaStoryReadRepository implements IStoryReadRepository {
   async findById(storyId: string, organizationId: string) {
     const row = await this.prisma.story.findFirst({
       where: { id: storyId, sprint: { project: { organizationId } } },
-      select: { id: true, title: true, description: true },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        externalId: true,
+        sprintId: true,
+        sprint: { select: { sourceConnectionId: true } },
+      },
     });
-    return row;
+    if (!row) {
+      return null;
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      externalId: row.externalId,
+      sprintId: row.sprintId,
+      sourceConnectionId: row.sprint.sourceConnectionId,
+    };
   }
 }

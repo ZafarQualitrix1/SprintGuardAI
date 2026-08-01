@@ -22,6 +22,7 @@ export class PrismaAiResponseRepository implements IAiResponseRepository {
         confidenceScore: input.confidenceScore,
         tokensUsed: input.tokensUsed,
         latencyMs: input.latencyMs,
+        costUsd: input.costUsd,
       },
     });
     return { id: row.id };
