@@ -28,7 +28,7 @@ export interface ResolvedAiConfig {
 
 // Resolves DB-configured provider credentials/parameters and per-module overrides into the
 // values AiOrchestrationService actually needs for a single execute() call. Centralizing this
-// here (rather than inline in the orchestration service) keeps the "where does this org's Gemini
+// here (rather than inline in the orchestration service) keeps the "where does this org's Groq
 // key/temperature/fallback come from" question answerable in one place -- also used directly by
 // the AI Settings test-connection command.
 @Injectable()

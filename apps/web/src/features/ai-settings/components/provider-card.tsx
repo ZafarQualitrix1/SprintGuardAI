@@ -13,7 +13,7 @@ import { ProviderHealthBadge } from './provider-status-badge';
 import { ProviderConfigDialog } from './provider-config-dialog';
 
 const PROVIDER_ICONS: Record<string, typeof Sparkles> = {
-  google: Sparkles,
+  groq: Cpu,
   openai: Brain,
   anthropic: Bot,
 };

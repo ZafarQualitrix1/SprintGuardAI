@@ -29,7 +29,7 @@ function toDto(entity: RequirementAnalysisReportEntity): RequirementAnalysisRepo
 }
 
 // Deliberately a separate controller from RequirementIntelligenceController (`/requirements`) --
-// this is the deeper, Gemini-backed capability, versioned and JSON-blob-shaped rather than the
+// this is the deeper, Groq-backed capability, versioned and JSON-blob-shaped rather than the
 // normalized Requirement/AcceptanceCriterion rows the other controller manages. Reuses the same
 // requirement:read/requirement:write permissions -- same bounded context, no new Permission rows.
 @ApiTags('Requirement Intelligence')

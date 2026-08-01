@@ -31,11 +31,11 @@ function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<str
     findByKey: jest.fn().mockResolvedValue({ id: 'agent-1', key: 'test-agent' }),
   };
   const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
-    findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'google', model: 'gemini-2.0-flash' }),
+    findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'groq', model: 'llama-3.3-70b-versatile' }),
     listAll: jest.fn().mockResolvedValue([]),
   };
   const aiProviderConfigService = {
-    resolveEffectiveConfig: jest.fn().mockResolvedValue({ provider: 'google', ...resolvedConfigOverrides }),
+    resolveEffectiveConfig: jest.fn().mockResolvedValue({ provider: 'groq', ...resolvedConfigOverrides }),
     resolveApiKey: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<AiProviderConfigService>;
 
@@ -55,7 +55,7 @@ function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<str
 describe('AiOrchestrationService', () => {
   it('returns parsed data and full confidence on the first valid attempt', async () => {
     const provider: jest.Mocked<IAiProvider> = {
-      key: 'google',
+      key: 'groq',
       complete: jest.fn().mockResolvedValue({ text: '{"items":["a","b"]}', inputTokens: 10, outputTokens: 5 }),
     };
     const { service, agentRunRepository, responseRepository } = buildService(provider);
@@ -70,8 +70,8 @@ describe('AiOrchestrationService', () => {
 
     expect(result.data).toEqual({ items: ['a', 'b'] });
     expect(result.confidenceScore).toBe(1);
-    expect(result.provider).toBe('google');
-    expect(result.model).toBe('gemini-2.0-flash');
+    expect(result.provider).toBe('groq');
+    expect(result.model).toBe('llama-3.3-70b-versatile');
     expect(provider.complete).toHaveBeenCalledTimes(1);
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'run-1', status: 'SUCCEEDED', confidenceScore: 1 }),
@@ -81,7 +81,7 @@ describe('AiOrchestrationService', () => {
 
   it('repairs once on invalid JSON and returns a discounted confidence score', async () => {
     const provider: jest.Mocked<IAiProvider> = {
-      key: 'google',
+      key: 'groq',
       complete: jest
         .fn()
         .mockResolvedValueOnce({ text: 'not valid json at all', inputTokens: 10, outputTokens: 5 })
@@ -106,7 +106,7 @@ describe('AiOrchestrationService', () => {
 
   it('flags the run for review and throws after exhausting retries when no fallback is configured', async () => {
     const provider: jest.Mocked<IAiProvider> = {
-      key: 'google',
+      key: 'groq',
       complete: jest.fn().mockResolvedValue({ text: 'still not json', inputTokens: 1, outputTokens: 1 }),
     };
     const { service, agentRunRepository } = buildService(provider);
@@ -128,7 +128,7 @@ describe('AiOrchestrationService', () => {
 
   it('retries once against the configured fallback provider when the primary exhausts its retries', async () => {
     const primaryProvider: jest.Mocked<IAiProvider> = {
-      key: 'google',
+      key: 'groq',
       complete: jest.fn().mockResolvedValue({ text: 'still not json', inputTokens: 1, outputTokens: 1 }),
     };
     const fallbackProvider: jest.Mocked<IAiProvider> = {
@@ -156,12 +156,12 @@ describe('AiOrchestrationService', () => {
       findByKey: jest.fn().mockResolvedValue({ id: 'agent-1', key: 'test-agent' }),
     };
     const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
-      findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'google', model: 'gemini-2.0-flash' }),
+      findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'groq', model: 'llama-3.3-70b-versatile' }),
       listAll: jest.fn().mockResolvedValue([]),
     };
     const aiProviderConfigService = {
       resolveEffectiveConfig: jest.fn().mockResolvedValue({
-        provider: 'google',
+        provider: 'groq',
         retryCount: 1,
         fallbackProvider: 'anthropic',
         fallbackModel: 'claude-sonnet-5',

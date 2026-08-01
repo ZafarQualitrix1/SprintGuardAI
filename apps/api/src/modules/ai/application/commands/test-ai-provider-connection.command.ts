@@ -77,8 +77,8 @@ export class TestAiProviderConnectionHandler
 
   private defaultModelFor(provider: string): string {
     switch (provider) {
-      case 'google':
-        return 'gemini-2.0-flash';
+      case 'groq':
+        return 'llama-3.3-70b-versatile';
       case 'openai':
         return 'gpt-4o-mini';
       case 'anthropic':

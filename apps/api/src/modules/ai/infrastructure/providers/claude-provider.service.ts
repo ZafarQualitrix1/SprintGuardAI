@@ -11,7 +11,7 @@ export class ClaudeProviderService implements IAiProvider {
 
   constructor(private readonly configService: ConfigService) {}
 
-  // Built per-call, not cached -- request.apiKey may differ per org (see GeminiProviderService).
+  // Built per-call, not cached -- request.apiKey may differ per org (see GroqProviderService).
   private getClient(apiKey?: string): Anthropic {
     const resolvedKey = apiKey ?? this.configService.get<string>('ai.anthropicApiKey');
     if (!resolvedKey) {

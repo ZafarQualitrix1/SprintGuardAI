@@ -27,8 +27,8 @@ export const envSchema = z.object({
 
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
-  GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
-  AI_DEFAULT_PROVIDER: z.enum(['anthropic', 'openai', 'google']).default('anthropic'),
+  GROQ_API_KEY: z.string().optional(),
+  AI_DEFAULT_PROVIDER: z.enum(['anthropic', 'openai', 'groq']).default('anthropic'),
 
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'verbose']).default('info'),

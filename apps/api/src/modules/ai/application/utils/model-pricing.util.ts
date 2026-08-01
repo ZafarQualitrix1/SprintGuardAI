@@ -3,11 +3,9 @@
 // AgentRun/AiResponse.costUsd columns permanently empty. Unknown models (custom registry entries)
 // simply don't get a cost estimate rather than a guessed one.
 const PRICE_PER_1K_TOKENS_USD: Record<string, number> = {
-  'gemini-2.5-pro': 0.00125,
-  'gemini-2.5-flash': 0.000075,
-  'gemini-2.0-flash': 0.0001,
-  'gemini-1.5-pro': 0.00125,
-  'gemini-1.5-flash': 0.000075,
+  'llama-3.3-70b-versatile': 0.0007,
+  'llama-3.1-8b-instant': 0.00007,
+  'gemma2-9b-it': 0.0002,
   'gpt-4o': 0.0025,
   'gpt-4o-mini': 0.00015,
   'claude-sonnet-5': 0.003,

@@ -161,8 +161,8 @@ async function main() {
       ],
     },
     {
-      provider: 'google',
-      model: 'gemini-2.0-flash',
+      provider: 'groq',
+      model: 'llama-3.3-70b-versatile',
       costTier: 'cheap',
       allowedCapabilities: [
         'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
@@ -222,7 +222,7 @@ async function main() {
       key: 'deep-requirement-analysis-agent',
       name: 'Deep Requirement Analysis Agent',
       description:
-        'Gemini-backed BA/QA-architect analysis of a full Jira story: requirements, risks, edge cases, ' +
+        'Groq-backed BA/QA-architect analysis of a full Jira story: requirements, risks, edge cases, ' +
         'API/DB/UI impact, enterprise test cases, and self-assessed coverage.',
       version: '1.0.0',
       capabilities: ['deep-requirement-analysis'],

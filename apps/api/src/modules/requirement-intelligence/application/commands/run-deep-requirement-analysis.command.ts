@@ -72,7 +72,7 @@ export class RunDeepRequirementAnalysisHandler
       organizationId: command.organizationId,
       variables: { storyContext },
       outputSchema: deepRequirementAnalysisOutputSchema,
-      provider: 'google',
+      provider: 'groq',
     });
 
     return this.reportRepository.createNewVersion({

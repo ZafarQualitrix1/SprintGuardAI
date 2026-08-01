@@ -56,7 +56,7 @@ export function LogsPanel() {
           </Label>
           <Input
             id="log-provider"
-            placeholder="e.g. google"
+            placeholder="e.g. groq"
             className="h-9 w-36"
             value={provider}
             onChange={(e) => {

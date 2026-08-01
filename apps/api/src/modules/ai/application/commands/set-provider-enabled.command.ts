@@ -7,7 +7,7 @@ import {
 } from '../../domain/repositories/ai-provider-config.repository.interface';
 import { AiAuditLogService } from '../../infrastructure/services/ai-audit-log.service';
 
-const SUPPORTED_PROVIDERS = new Set(['google', 'openai', 'anthropic']);
+const SUPPORTED_PROVIDERS = new Set(['groq', 'openai', 'anthropic']);
 
 export class SetProviderEnabledCommand {
   constructor(

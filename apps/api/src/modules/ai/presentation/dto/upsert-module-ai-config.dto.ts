@@ -9,7 +9,7 @@ export class UpsertModuleAiConfigDto {
 
   @ApiPropertyOptional({ description: 'null/omitted = use the organization default provider' })
   @IsOptional()
-  @IsIn(['google', 'openai', 'anthropic'])
+  @IsIn(['groq', 'openai', 'anthropic'])
   provider?: string;
 
   @ApiPropertyOptional({ description: 'null/omitted = use the ModelRegistry default for this provider/capability' })
@@ -51,7 +51,7 @@ export class UpsertModuleAiConfigDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsIn(['google', 'openai', 'anthropic'])
+  @IsIn(['groq', 'openai', 'anthropic'])
   fallbackProvider?: string;
 
   @ApiPropertyOptional()

@@ -13,7 +13,7 @@ export interface Requirement {
   acceptanceCriteria: AcceptanceCriterion[];
 }
 
-// Deep, Gemini-backed Requirement Intelligence report: business-analyst/QA-architect analysis +
+// Deep, Groq-backed Requirement Intelligence report: business-analyst/QA-architect analysis +
 // an enterprise test suite + self-assessed coverage, versioned per story. Deliberately separate
 // from Requirement/AcceptanceCriterion above (which stay normalized and feed the Coverage tab).
 export interface RequirementAnalysisTestCase {

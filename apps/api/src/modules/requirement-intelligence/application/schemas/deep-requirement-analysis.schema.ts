@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Output contract for the 'deep-requirement-analysis' capability (Gemini-backed). Deliberately
+// Output contract for the 'deep-requirement-analysis' capability (Groq-backed). Deliberately
 // separate from requirementIntelligenceOutputSchema (which stays normalized into
 // Requirement/AcceptanceCriterion rows and feeds the Coverage tab) -- this is a much larger,
 // versioned JSON snapshot per analysis run. Every array defaults to [] rather than requiring

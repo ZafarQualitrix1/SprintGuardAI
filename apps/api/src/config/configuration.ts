@@ -28,7 +28,7 @@ export default () => ({
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     openAiApiKey: process.env.OPENAI_API_KEY,
-    googleApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+    groqApiKey: process.env.GROQ_API_KEY,
     defaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'anthropic',
   },
   observability: {

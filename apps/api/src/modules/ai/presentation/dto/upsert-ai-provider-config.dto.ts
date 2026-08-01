@@ -8,12 +8,12 @@ export class UpsertAiProviderConfigDto {
   @MinLength(8)
   apiKey?: string;
 
-  @ApiPropertyOptional({ example: 'gemini-2.0-flash' })
+  @ApiPropertyOptional({ example: 'llama-3.3-70b-versatile' })
   @IsOptional()
   @IsString()
   defaultModel?: string;
 
-  @ApiPropertyOptional({ description: 'Gemini project ID' })
+  @ApiPropertyOptional({ description: 'Provider-specific project ID, if applicable' })
   @IsOptional()
   @IsString()
   projectId?: string;
@@ -75,7 +75,7 @@ export class UpsertAiProviderConfigDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsIn(['google', 'openai', 'anthropic'])
+  @IsIn(['groq', 'openai', 'anthropic'])
   fallbackProvider?: string;
 
   @ApiPropertyOptional()

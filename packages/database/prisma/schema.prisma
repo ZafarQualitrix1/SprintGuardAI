@@ -258,7 +258,7 @@ model Story {
   @@index([sprintId, status])
 }
 
-// Deep, Gemini-generated business-analyst/QA-architect report for a single story: risks, edge
+// Deep, Groq-generated business-analyst/QA-architect report for a single story: risks, edge
 // cases, API/DB/UI impact, enterprise test cases, self-assessed coverage. Deliberately separate
 // from Requirement/AcceptanceCriterion (which stay normalized and feed the Coverage tab) --
 // this is a versioned JSON snapshot per analysis run, not normalized rows.

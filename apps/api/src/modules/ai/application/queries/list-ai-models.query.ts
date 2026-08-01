@@ -15,11 +15,9 @@ export interface AiModelSummary extends ModelRegistryEntryView {
 // a schema change; ModelRegistryEntry.costTier already covers the cost dimension. Unknown models
 // (custom registry entries an admin adds directly to the DB) fall back to a generic description.
 const MODEL_DISPLAY_METADATA: Record<string, { speedLabel: string; bestUseCase: string }> = {
-  'gemini-2.5-pro': { speedLabel: 'Moderate', bestUseCase: 'Complex reasoning, long-context analysis' },
-  'gemini-2.5-flash': { speedLabel: 'Fast', bestUseCase: 'High-volume, latency-sensitive generation' },
-  'gemini-2.0-flash': { speedLabel: 'Fast', bestUseCase: 'General-purpose extraction and generation' },
-  'gemini-1.5-pro': { speedLabel: 'Moderate', bestUseCase: 'Large-context document analysis' },
-  'gemini-1.5-flash': { speedLabel: 'Fast', bestUseCase: 'Lightweight, high-throughput tasks' },
+  'llama-3.3-70b-versatile': { speedLabel: 'Fast', bestUseCase: 'Complex reasoning, general-purpose extraction and generation' },
+  'llama-3.1-8b-instant': { speedLabel: 'Fast', bestUseCase: 'Lightweight, high-throughput tasks' },
+  'gemma2-9b-it': { speedLabel: 'Fast', bestUseCase: 'Balanced quality and speed for general-purpose tasks' },
   'gpt-4o': { speedLabel: 'Moderate', bestUseCase: 'Complex multi-step reasoning' },
   'gpt-4o-mini': { speedLabel: 'Fast', bestUseCase: 'Cost-efficient general-purpose tasks' },
   'claude-sonnet-5': { speedLabel: 'Moderate', bestUseCase: 'Balanced reasoning and generation quality' },

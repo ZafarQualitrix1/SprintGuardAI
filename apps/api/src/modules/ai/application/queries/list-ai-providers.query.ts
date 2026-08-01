@@ -29,11 +29,10 @@ export interface AiProviderSummary {
 }
 
 const KNOWN_PROVIDERS: Array<{ provider: string; displayName: string; supported: boolean }> = [
-  { provider: 'google', displayName: 'Google Gemini', supported: true },
+  { provider: 'groq', displayName: 'Groq', supported: true },
   { provider: 'openai', displayName: 'OpenAI', supported: true },
   { provider: 'anthropic', displayName: 'Claude (Anthropic)', supported: true },
   { provider: 'deepseek', displayName: 'DeepSeek', supported: false },
-  { provider: 'groq', displayName: 'Groq', supported: false },
   { provider: 'ollama', displayName: 'Ollama', supported: false },
   { provider: 'openrouter', displayName: 'OpenRouter', supported: false },
 ];

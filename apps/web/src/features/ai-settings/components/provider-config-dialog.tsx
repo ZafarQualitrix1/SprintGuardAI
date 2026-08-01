@@ -111,7 +111,7 @@ export function ProviderConfigDialog({ provider, open, onOpenChange }: ProviderC
           </div>
           <div className="space-y-2">
             <Label htmlFor="defaultModel">Default model</Label>
-            <Input id="defaultModel" placeholder="e.g. gemini-2.0-flash" {...register('defaultModel')} />
+            <Input id="defaultModel" placeholder="e.g. llama-3.3-70b-versatile" {...register('defaultModel')} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

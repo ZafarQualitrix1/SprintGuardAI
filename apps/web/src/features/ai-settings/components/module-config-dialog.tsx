@@ -101,11 +101,11 @@ export function ModuleConfigDialog({ module, open, onOpenChange }: ModuleConfigD
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="provider">Provider override</Label>
-              <Input id="provider" placeholder="e.g. google" {...register('provider')} />
+              <Input id="provider" placeholder="e.g. groq" {...register('provider')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="model">Model override</Label>
-              <Input id="model" placeholder="e.g. gemini-2.5-pro" {...register('model')} />
+              <Input id="model" placeholder="e.g. llama-3.3-70b-versatile" {...register('model')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="temperature">Temperature</Label>
