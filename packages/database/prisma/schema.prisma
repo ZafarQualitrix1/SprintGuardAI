@@ -396,6 +396,7 @@ model CoverageMatrixEntry {
 
   @@index([projectId, sprintId])
   @@index([requirementId])
+  @@unique([sprintId, requirementId])
 }
 
 enum GapSeverity {
@@ -423,6 +424,7 @@ model Gap {
   testCase    TestCase?    @relation(fields: [testCaseId], references: [id])
 
   @@index([projectId, sprintId])
+  @@unique([sprintId, requirementId])
 }
 
 model RiskAssessment {

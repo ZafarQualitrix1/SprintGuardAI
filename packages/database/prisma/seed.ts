@@ -14,6 +14,7 @@ const PERMISSIONS = [
   { key: 'test:read', description: 'View test scenarios and test cases' },
   { key: 'test:write', description: 'Generate/edit test scenarios and test cases' },
   { key: 'coverage:read', description: 'View coverage matrix and gap analysis' },
+  { key: 'coverage:write', description: 'Compute/recompute coverage matrix and gap analysis' },
   { key: 'execution:read', description: 'View test execution results' },
   { key: 'execution:write', description: 'Record test execution results' },
   { key: 'release:read', description: 'View release readiness reports' },
@@ -37,20 +38,20 @@ const ROLES: Record<string, { name: string; permissions: string[] }> = {
     name: 'Project Admin',
     permissions: [
       'sprint:read', 'sprint:write', 'requirement:read', 'requirement:write',
-      'test:read', 'test:write', 'coverage:read', 'execution:read', 'execution:write',
+      'test:read', 'test:write', 'coverage:read', 'coverage:write', 'execution:read', 'execution:write',
       'release:read', 'release:publish', 'integration:manage',
     ],
   },
   QA_LEAD: {
     name: 'QA Lead',
     permissions: [
-      'sprint:read', 'requirement:read', 'test:read', 'test:write', 'coverage:read',
+      'sprint:read', 'requirement:read', 'test:read', 'test:write', 'coverage:read', 'coverage:write',
       'execution:read', 'execution:write', 'release:read', 'prompt:read', 'prompt:approve',
     ],
   },
   QA_ENGINEER: {
     name: 'QA Engineer',
-    permissions: ['sprint:read', 'requirement:read', 'test:read', 'test:write', 'coverage:read', 'execution:read', 'execution:write'],
+    permissions: ['sprint:read', 'requirement:read', 'test:read', 'test:write', 'coverage:read', 'coverage:write', 'execution:read', 'execution:write'],
   },
   PRODUCT_MANAGER: {
     name: 'Product Manager',
@@ -147,19 +148,25 @@ async function main() {
       provider: 'anthropic',
       model: 'claude-sonnet-5',
       costTier: 'reasoning',
-      allowedCapabilities: ['requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary'],
+      allowedCapabilities: [
+        'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
+      ],
     },
     {
       provider: 'openai',
       model: 'gpt-4o-mini',
       costTier: 'standard',
-      allowedCapabilities: ['requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary'],
+      allowedCapabilities: [
+        'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
+      ],
     },
     {
       provider: 'google',
       model: 'gemini-2.0-flash',
       costTier: 'cheap',
-      allowedCapabilities: ['requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary'],
+      allowedCapabilities: [
+        'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
+      ],
     },
   ] as const;
 
@@ -202,6 +209,13 @@ async function main() {
       description: 'Generates an executive narrative summary from computed release readiness metrics.',
       version: '1.0.0',
       capabilities: ['release-readiness-summary'],
+    },
+    {
+      key: 'coverage-agent',
+      name: 'Coverage Agent',
+      description: 'Reviews computed coverage gaps and suggests additional test scenarios to close them.',
+      version: '1.0.0',
+      capabilities: ['coverage-recommendation'],
     },
   ] as const;
 
@@ -355,6 +369,47 @@ async function main() {
         properties: {
           summary: { type: 'string' },
           highlights: { type: 'array', minItems: 1, items: { type: 'string' } },
+        },
+      },
+    },
+    {
+      capability: 'coverage-recommendation',
+      template: [
+        'You are a senior QA lead reviewing test coverage for a sprint. Given the computed coverage',
+        'gaps below, suggest specific additional test scenarios to close them, and rate overall',
+        'test-suite quality. If there are no gaps, return an empty missingScenarios array.',
+        '',
+        'Sprint: {{sprintName}}',
+        'Coverage: {{coveragePercent}}% fully covered ({{coveredCount}} of {{totalRequirements}} requirements),',
+        '{{partiallyCoveredCount}} partially covered, {{notCoveredCount}} not covered.',
+        '',
+        'Requirements needing attention:',
+        '{{uncoveredRequirementsList}}',
+        '',
+        'Existing test case titles in this sprint (avoid suggesting exact duplicates):',
+        '{{existingTestTitles}}',
+        '',
+        'Respond with ONLY valid JSON (no markdown fences, no commentary) matching exactly this shape:',
+        '{"qualityScore":number (0-100),"missingScenarios":[{"requirementText":string,"suggestedScenario":string,"reason":string}],"summary":string}',
+      ].join('\n'),
+      jsonSchema: {
+        type: 'object',
+        required: ['qualityScore', 'missingScenarios', 'summary'],
+        properties: {
+          qualityScore: { type: 'number' },
+          missingScenarios: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['requirementText', 'suggestedScenario', 'reason'],
+              properties: {
+                requirementText: { type: 'string' },
+                suggestedScenario: { type: 'string' },
+                reason: { type: 'string' },
+              },
+            },
+          },
+          summary: { type: 'string' },
         },
       },
     },

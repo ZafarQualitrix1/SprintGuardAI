@@ -20,6 +20,7 @@ import { SprintModule } from './modules/sprint/sprint.module';
 import { RequirementIntelligenceModule } from './modules/requirement-intelligence/requirement-intelligence.module';
 import { TestIntelligenceModule } from './modules/test-intelligence/test-intelligence.module';
 import { ExecutionModule } from './modules/execution/execution.module';
+import { CoverageModule } from './modules/coverage/coverage.module';
 import { ReleaseModule } from './modules/release/release.module';
 import { DefectModule } from './modules/defect/defect.module';
 import { AgentsModule } from './modules/agents/agents.module';
@@ -71,6 +72,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     RequirementIntelligenceModule,
     TestIntelligenceModule,
     ExecutionModule,
+    CoverageModule,
     ReleaseModule,
     DefectModule,
     AgentsModule,
