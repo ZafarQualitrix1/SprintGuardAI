@@ -42,6 +42,14 @@ export function useDisconnectConnection() {
   });
 }
 
+export function useDeleteConnection() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: integrationApi.deletePermanently,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CONNECTIONS_KEY }),
+  });
+}
+
 export function useSetDefaultConnection() {
   const queryClient = useQueryClient();
   return useMutation({

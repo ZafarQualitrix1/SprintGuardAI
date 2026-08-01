@@ -10,6 +10,7 @@ import {
   Pencil,
   RefreshCw,
   Star,
+  Trash2,
   Unplug,
   Upload,
   Wifi,
@@ -35,6 +36,7 @@ import {
 } from '@/features/integration/api';
 import { ConnectionFormDialog } from './connection-form-dialog';
 import { DisconnectConnectionDialog } from './disconnect-connection-dialog';
+import { DeleteConnectionDialog } from './delete-connection-dialog';
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'Never';
@@ -69,6 +71,7 @@ interface ConnectionCardProps {
 export function ConnectionCard({ connection }: ConnectionCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
 
   const test = useTestConnection();
@@ -174,6 +177,12 @@ export function ConnectionCard({ connection }: ConnectionCardProps) {
               >
                 <Unplug className="mr-2 h-4 w-4" /> Disconnect
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => setDeleteOpen(true)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete permanently
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </CardHeader>
@@ -206,6 +215,7 @@ export function ConnectionCard({ connection }: ConnectionCardProps) {
         open={disconnectOpen}
         onOpenChange={setDisconnectOpen}
       />
+      <DeleteConnectionDialog connection={connection} open={deleteOpen} onOpenChange={setDeleteOpen} />
     </>
   );
 }

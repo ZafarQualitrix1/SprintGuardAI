@@ -42,6 +42,8 @@ export interface IIntegrationConnectionRepository {
   setDefault(id: string, organizationId: string): Promise<IntegrationConnectionEntity>;
   /** Soft-disconnect: status=DISCONNECTED, credentials tombstoned. Row (and any imported sprint data) stays. */
   softDisconnect(id: string, organizationId: string): Promise<IntegrationConnectionEntity>;
+  /** Permanently deletes the connection row (cascades to its cached projects, webhook events and sync jobs). */
+  hardDelete(id: string, organizationId: string): Promise<void>;
   updateHealth(
     id: string,
     healthStatus: HealthStatus,

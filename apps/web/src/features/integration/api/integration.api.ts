@@ -21,6 +21,7 @@ export const integrationApi = {
   update: (id: string, input: UpdateConnectionInput) =>
     apiClient.patch<IntegrationConnection>(`/integrations/${id}`, input),
   disconnect: (id: string) => apiClient.post<IntegrationConnection>(`/integrations/${id}/disconnect`),
+  deletePermanently: (id: string) => apiClient.delete<void>(`/integrations/${id}`),
   setDefault: (id: string) => apiClient.post<IntegrationConnection>(`/integrations/${id}/set-default`),
   test: (id: string) => apiClient.post<TestConnectionResult>(`/integrations/${id}/test`),
   sync: (id: string) => apiClient.post<SyncConnectionResult>(`/integrations/${id}/sync`),

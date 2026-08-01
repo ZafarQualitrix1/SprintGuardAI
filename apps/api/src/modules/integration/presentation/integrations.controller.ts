@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
@@ -6,6 +6,7 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { ConnectJiraCommand } from '../application/commands/connect-jira.command';
 import { UpdateConnectionCommand } from '../application/commands/update-connection.command';
 import { DisconnectConnectionCommand } from '../application/commands/disconnect-connection.command';
+import { DeleteConnectionCommand } from '../application/commands/delete-connection.command';
 import { SetDefaultConnectionCommand } from '../application/commands/set-default-connection.command';
 import { TestConnectionCommand, TestConnectionResult } from '../application/commands/test-connection.command';
 import { SyncConnectionCommand, SyncConnectionResult } from '../application/commands/sync-connection.command';
@@ -126,6 +127,15 @@ export class IntegrationsController {
       new DisconnectConnectionCommand(user.organizationId, user.userId, id),
     );
     return toDto(connection);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('integration:manage')
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.commandBus.execute<DeleteConnectionCommand, void>(
+      new DeleteConnectionCommand(user.organizationId, user.userId, id),
+    );
   }
 
   @Post(':id/set-default')

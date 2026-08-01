@@ -147,6 +147,11 @@ export class PrismaIntegrationConnectionRepository implements IIntegrationConnec
     return toIntegrationConnectionEntity(row);
   }
 
+  async hardDelete(id: string, organizationId: string) {
+    await this.assertExists(id, organizationId);
+    await this.prisma.integrationConnection.delete({ where: { id } });
+  }
+
   async updateHealth(
     id: string,
     healthStatus: HealthStatus,
