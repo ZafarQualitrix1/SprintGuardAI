@@ -173,7 +173,7 @@ export function PromptLibrary() {
 
       {!isLoading && data?.rows.length === 0 && !search && !status ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Sparkles className="h-3.5 w-3.5" /> Tip: existing built-in agents already have prompts seeded — try searching "requirement" or "test case".
+          <Sparkles className="h-3.5 w-3.5" /> Tip: existing built-in agents already have prompts seeded — try searching &ldquo;requirement&rdquo; or &ldquo;test case&rdquo;.
         </p>
       ) : null}
     </div>

@@ -40,3 +40,57 @@ export function useImportJiraSprint() {
     },
   });
 }
+
+function invalidateSprint(queryClient: ReturnType<typeof useQueryClient>, projectId: string, sprintId: string) {
+  queryClient.invalidateQueries({ queryKey: ['sprint', 'list', projectId] });
+  queryClient.invalidateQueries({ queryKey: ['sprint', 'detail', sprintId] });
+}
+
+export function useSyncSprint(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sprintId: string) => sprintsApi.sync(sprintId),
+    onSuccess: (sprint) => invalidateSprint(queryClient, projectId, sprint.id),
+  });
+}
+
+export function useOverrideSprint(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sprintId: string) => sprintsApi.override(sprintId),
+    onSuccess: (sprint) => invalidateSprint(queryClient, projectId, sprint.id),
+  });
+}
+
+export function useRenameSprint(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sprintId, name }: { sprintId: string; name: string }) => sprintsApi.rename(sprintId, name),
+    onSuccess: (sprint) => invalidateSprint(queryClient, projectId, sprint.id),
+  });
+}
+
+export function useArchiveSprint(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sprintId, archived }: { sprintId: string; archived: boolean }) =>
+      sprintsApi.setArchived(sprintId, archived),
+    onSuccess: (sprint) => invalidateSprint(queryClient, projectId, sprint.id),
+  });
+}
+
+export function useDeleteSprint(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sprintId: string) => sprintsApi.remove(sprintId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sprint', 'list', projectId] }),
+  });
+}
+
+export function useSprintSyncHistory(sprintId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['sprint', 'sync-history', sprintId],
+    queryFn: () => sprintsApi.syncHistory(sprintId),
+    enabled,
+  });
+}

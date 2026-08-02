@@ -31,6 +31,20 @@ export interface Sprint {
   source: string;
   startDate: string | null;
   endDate: string | null;
+  canSync: boolean;
+  lastSyncedAt: string | null;
+  archivedAt: string | null;
+}
+
+export interface SprintSyncEvent {
+  id: string;
+  action: string;
+  status: string;
+  storiesCreated: number;
+  storiesUpdated: number;
+  errorMessage: string | null;
+  triggeredBy: string | null;
+  createdAt: string;
 }
 
 export interface Story {

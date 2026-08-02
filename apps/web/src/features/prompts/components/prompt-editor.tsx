@@ -326,7 +326,7 @@ export function PromptEditor({ capability, version, onVersionChange, onViewHisto
                     {approval.decision}
                   </Badge>
                   {approval.reviewerName} · {new Date(approval.createdAt).toLocaleDateString()}
-                  {approval.rationale ? <p className="mt-0.5 italic">"{approval.rationale}"</p> : null}
+                  {approval.rationale ? <p className="mt-0.5 italic">&ldquo;{approval.rationale}&rdquo;</p> : null}
                 </div>
               ))}
             </div>

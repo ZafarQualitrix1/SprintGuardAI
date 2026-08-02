@@ -69,7 +69,7 @@ export function CreatePromptDialog({ open, onOpenChange, onCreated }: CreateProm
         <DialogHeader>
           <DialogTitle>New prompt</DialogTitle>
           <DialogDescription>
-            Creates a v1 DRAFT for a new capability. You'll fill in the template and metadata next.
+            Creates a v1 DRAFT for a new capability. You&apos;ll fill in the template and metadata next.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
