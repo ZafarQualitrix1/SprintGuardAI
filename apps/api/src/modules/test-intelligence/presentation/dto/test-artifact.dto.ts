@@ -10,6 +10,15 @@ export class TestCaseDto {
   @ApiProperty() title!: string;
   @ApiProperty({ type: [TestStepDto] }) steps!: TestStepDto[];
   @ApiProperty() priority!: string;
+  @ApiPropertyOptional({ nullable: true }) description!: string | null;
+  @ApiProperty() severity!: string;
+  @ApiPropertyOptional({ nullable: true }) module!: string | null;
+  @ApiProperty() testType!: string;
+  @ApiProperty({ type: [String] }) tags!: string[];
+  @ApiProperty() automationStatus!: string;
+  @ApiProperty() automationType!: string;
+  @ApiPropertyOptional({ nullable: true }) apiEndpoint!: string | null;
+  @ApiPropertyOptional({ nullable: true }) uiScreen!: string | null;
 }
 
 export class TestScenarioDto {

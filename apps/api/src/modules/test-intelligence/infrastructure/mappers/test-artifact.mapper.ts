@@ -4,7 +4,22 @@ import { TestCaseEntity, TestScenarioEntity, TestStep } from '../../domain/entit
 type TestScenarioWithCases = TestScenario & { testCases: TestCase[] };
 
 export function toTestCaseEntity(row: TestCase): TestCaseEntity {
-  return new TestCaseEntity(row.id, row.testScenarioId, row.title, row.steps as unknown as TestStep[], row.priority);
+  return new TestCaseEntity(
+    row.id,
+    row.testScenarioId,
+    row.title,
+    row.steps as unknown as TestStep[],
+    row.priority,
+    row.description,
+    row.severity,
+    row.module,
+    row.testType,
+    (row.tags as unknown as string[] | null) ?? [],
+    row.automationStatus,
+    row.automationType,
+    row.apiEndpoint,
+    row.uiScreen,
+  );
 }
 
 export function toTestScenarioEntity(row: TestScenarioWithCases): TestScenarioEntity {

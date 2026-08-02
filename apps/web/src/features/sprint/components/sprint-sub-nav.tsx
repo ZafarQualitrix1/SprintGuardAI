@@ -13,6 +13,7 @@ const TABS = [
   { label: 'Requirements', suffix: 'requirements' },
   { label: 'Coverage', suffix: 'coverage' },
   { label: 'Test Generator', suffix: 'test-generator' },
+  { label: 'Automation', suffix: 'automation' },
   { label: 'Executions', suffix: 'executions' },
   { label: 'Release Readiness', suffix: 'release-readiness' },
 ] as const;

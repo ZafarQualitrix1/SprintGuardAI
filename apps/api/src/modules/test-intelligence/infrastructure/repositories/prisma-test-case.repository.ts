@@ -22,6 +22,15 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
             title: testCase.title,
             steps: testCase.steps as unknown as Prisma.InputJsonValue,
             priority: testCase.priority,
+            description: testCase.description,
+            severity: testCase.severity,
+            module: testCase.module,
+            testType: testCase.testType,
+            tags: testCase.tags as unknown as Prisma.InputJsonValue,
+            automationStatus: testCase.automationStatus,
+            automationType: testCase.automationType,
+            apiEndpoint: testCase.apiEndpoint,
+            uiScreen: testCase.uiScreen,
           },
         });
         created.push(row);

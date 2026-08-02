@@ -8,6 +8,7 @@ export * from './schemas/requirement-intelligence';
 export * from './schemas/test-intelligence';
 export * from './schemas/coverage';
 export * from './schemas/execution';
+export * from './schemas/automation';
 export * from './schemas/release';
 export * from './schemas/ai-settings';
 export * from './schemas/prompt-management';

@@ -19,6 +19,15 @@ function toDto(entity: TestScenarioEntity): TestScenarioDto {
       title: tc.title,
       steps: tc.steps,
       priority: tc.priority,
+      description: tc.description,
+      severity: tc.severity,
+      module: tc.module,
+      testType: tc.testType,
+      tags: tc.tags,
+      automationStatus: tc.automationStatus,
+      automationType: tc.automationType,
+      apiEndpoint: tc.apiEndpoint,
+      uiScreen: tc.uiScreen,
     })),
   };
 }

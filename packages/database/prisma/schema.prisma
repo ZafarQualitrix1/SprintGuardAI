@@ -274,19 +274,22 @@ enum StoryStatus {
 }
 
 model Story {
-  id          String       @id @default(cuid())
-  sprintId    String
-  externalId  String?
-  title       String
-  description String?
-  storyPoints Int?
-  status      StoryStatus  @default(BACKLOG)
-  priority    String?
-  assignee    String?
-  source      SprintSource @default(MANUAL)
-  raw         Json?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                          String       @id @default(cuid())
+  sprintId                    String
+  externalId                  String?
+  title                       String
+  description                 String?
+  storyPoints                 Int?
+  status                      StoryStatus  @default(BACKLOG)
+  priority                    String?
+  assignee                    String?
+  source                      SprintSource @default(MANUAL)
+  raw                         Json?
+  assignedBaEmail             String? // Business Analyst assigned to review this story's AI-generated test cases
+  assignedBaJiraAccountId     String? // resolved & cached Jira accountId for @mentions, cleared when assignedBaEmail changes
+  assignedBaAccountResolvedAt DateTime?
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
 
   sprint                     Sprint                      @relation(fields: [sprintId], references: [id], onDelete: Cascade)
   requirements               Requirement[]
@@ -296,10 +299,11 @@ model Story {
   riskAssessments            RiskAssessment[]
   defects                    Defect[]
   requirementAnalysisReports RequirementAnalysisReport[]
+  baReviewState              StoryBaReviewState?
 
+  @@unique([sprintId, externalId])
   @@index([sprintId])
   @@index([sprintId, status])
-  @@unique([sprintId, externalId])
 }
 
 // Deep, Groq-generated business-analyst/QA-architect report for a single story: risks, edge
@@ -432,24 +436,209 @@ enum AutomationStatus {
   AUTOMATED
 }
 
+enum TestType {
+  FUNCTIONAL
+  NEGATIVE
+  BOUNDARY
+  VALIDATION
+  BUSINESS_RULE
+  API
+  UI
+  SECURITY
+  PERFORMANCE
+  ACCESSIBILITY
+  DATABASE
+  INTEGRATION
+  REGRESSION
+  SMOKE
+  SANITY
+}
+
+enum AutomationType {
+  NONE
+  API
+  UI
+}
+
 model TestCase {
   id                    String           @id @default(cuid())
   testScenarioId        String
   title                 String
+  description           String?
   steps                 Json // { step: string, expected: string }[]
   testData              Json?
   priority              Priority         @default(MEDIUM)
+  severity              Priority         @default(MEDIUM)
+  module                String?
+  testType              TestType         @default(FUNCTIONAL)
+  tags                  Json? // string[]
   automationStatus      AutomationStatus @default(MANUAL)
+  automationType        AutomationType   @default(NONE)
+  apiEndpoint           String?
+  uiScreen              String?
   generatedByAgentRunId String?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
-  testScenario   TestScenario          @relation(fields: [testScenarioId], references: [id], onDelete: Cascade)
-  executions     Execution[]
-  coverageMatrix CoverageMatrixEntry[]
-  gaps           Gap[]
+  testScenario          TestScenario           @relation(fields: [testScenarioId], references: [id], onDelete: Cascade)
+  executions            Execution[]
+  coverageMatrix        CoverageMatrixEntry[]
+  gaps                  Gap[]
+  automationGenerations AutomationGeneration[]
 
   @@index([testScenarioId])
+  @@index([automationType])
+}
+
+enum AutomationGenerationStatus {
+  GENERATED
+  SAVED
+  COMMITTED
+}
+
+model AutomationGeneration {
+  id                        String                     @id @default(cuid())
+  testCaseId                String
+  automationType            AutomationType // API | UI (never NONE here)
+  version                   Int
+  status                    AutomationGenerationStatus @default(GENERATED)
+  frameworkVersion          String
+  generatorVersion          String
+  aiModelVersion            String
+  files                     Json // { path: string, content: string }[]
+  automationReadinessScore  Int?
+  estimatedEffortHours      Float?
+  complexityLevel           String? // LOW | MEDIUM | HIGH
+  requiredPreconditions     Json? // string[]
+  missingRequirementDetails Json? // string[]
+  generatedByAgentRunId     String?
+  createdBy                 String?
+  createdAt                 DateTime                   @default(now())
+
+  testCase TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+
+  @@unique([testCaseId, automationType, version])
+  @@index([testCaseId, automationType])
+}
+
+// ============================================================================
+// BA Review Workflow
+// ============================================================================
+// Mandatory Business-Analyst approval gate for AI-generated test cases, over Jira. TestCase/
+// TestScenario rows themselves stay unversioned (see RunTestGenerationHandler) -- BaReviewCycle
+// is the versioned, immutable audit trail (testCasesSnapshotJson) layered on top, and
+// StoryBaReviewState is the single lock/status aggregate per story that RunTestGenerationHandler,
+// RunRequirementIntelligenceAgentHandler, and RunDeepRequirementAnalysisHandler all check via
+// IsStoryLockedQuery before allowing any AI regeneration.
+
+enum BaReviewStatus {
+  PENDING_REVIEW // cycle created, Jira comment/attachment not yet successfully posted
+  AWAITING_APPROVAL // posted to Jira, waiting on BA reply
+  FEEDBACK_RECEIVED // non-approval reply detected, regeneration not yet started
+  REGENERATION_IN_PROGRESS // AI feedback-merge running
+  APPROVED // terminal, locked
+}
+
+enum BaReviewApprovalStatus {
+  PENDING // this cycle/version posted, awaiting reply
+  FEEDBACK_RECEIVED // terminal for this cycle -- a new cycle (version+1) supersedes it
+  APPROVED // terminal, this version is the baseline
+}
+
+enum BaReviewSyncAction {
+  RESOLVE_BA_ACCOUNT
+  POST_INITIAL_COMMENT
+  UPLOAD_ATTACHMENT
+  POLL_REPLIES
+  POST_FOLLOWUP_COMMENT
+}
+
+enum BaReviewSyncStatus {
+  SUCCESS
+  FAILED
+}
+
+model StoryBaReviewState {
+  id                   String         @id @default(cuid())
+  storyId              String         @unique
+  organizationId       String
+  status               BaReviewStatus @default(PENDING_REVIEW)
+  currentVersion       Int            @default(0)
+  isLocked             Boolean        @default(false)
+  activeReviewCycleId  String? // the one non-terminal BaReviewCycle for this story, if any
+  lockedVersionId      String? // the BaReviewCycle that became the approved baseline
+  reviewCycleCount     Int            @default(0)
+  latestReviewerName   String? // Jira display name of the last replier
+  latestReviewerUserId String? // best-effort match against User by email
+  lastReviewAt         DateTime?
+  lockedAt             DateTime?
+  unlockedBy           String? // internal User.id (Admin)
+  unlockedAt           DateTime?
+  unlockReason         String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  story        Story           @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reviewCycles BaReviewCycle[]
+
+  @@index([organizationId, status])
+}
+
+model BaReviewCycle {
+  id                              String                 @id @default(cuid())
+  storyBaReviewStateId            String
+  storyId                         String
+  organizationId                  String
+  version                         Int
+  documentVersionLabel            String // "V1", "V2", ... == `V${version}`
+  generatedBy                     String? // internal User.id who triggered generation; null if system-triggered
+  generatedAt                     DateTime               @default(now())
+  aiProvider                      String
+  aiModelVersion                  String
+  promptVersion                   String
+  requirementAnalysisReportId     String? // input context used, if any
+  testCasesSnapshotJson           Json // immutable [{scenario, testCases[]}] copy at this version
+  distributionJson                Json // counts per TestType
+  totalTestCases                  Int
+  coveragePercent                 Float?
+  automationReadinessPercent      Float?
+  jiraIssueKey                    String // denormalized Story.externalId at post time
+  jiraCommentId                   String?
+  jiraAttachmentId                String?
+  respondsToFeedbackFromVersionId String? // the previous cycle whose feedback triggered this version (null for V1)
+  improvementSummaryJson          Json? // {feedbackSummary, added[], modified[], removedReasons, coverageImpact, automationReadinessImpact, traceabilityImpact}
+  feedbackText                    String? // BA's raw reply that ended THIS cycle
+  feedbackAuthor                  String?
+  feedbackJiraCommentId           String? // idempotency marker: last comment id already processed for this cycle
+  feedbackReceivedAt              DateTime?
+  approvalStatus                  BaReviewApprovalStatus @default(PENDING)
+  approvedBy                      String? // Jira display name
+  approvedByUserId                String? // best-effort internal User.id match
+  approvalComment                 String? // literal reply text that satisfied the keyword match
+  approvedAt                      DateTime?
+  createdAt                       DateTime               @default(now())
+  updatedAt                       DateTime               @updatedAt
+
+  storyBaReviewState StoryBaReviewState @relation(fields: [storyBaReviewStateId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, version])
+  @@index([storyId, approvalStatus])
+  @@index([organizationId])
+}
+
+model BaReviewSyncLog {
+  id             String             @id @default(cuid())
+  storyId        String
+  organizationId String
+  reviewCycleId  String?
+  action         BaReviewSyncAction
+  status         BaReviewSyncStatus @default(SUCCESS)
+  attempt        Int                @default(1)
+  errorMessage   String?
+  createdAt      DateTime           @default(now())
+
+  @@index([storyId, createdAt])
+  @@index([organizationId, status])
 }
 
 // ============================================================================
