@@ -26,9 +26,12 @@ function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<str
       template: 'Say hello to {{name}}',
       templateHash: 'hash-1',
     }),
+    findById: jest.fn().mockResolvedValue(null),
   };
   const agentRepository: jest.Mocked<IAgentRepository> = {
     findByKey: jest.fn().mockResolvedValue({ id: 'agent-1', key: 'test-agent' }),
+    findByCapability: jest.fn().mockResolvedValue(null),
+    appendCapability: jest.fn().mockResolvedValue(undefined),
   };
   const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
     findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'groq', model: 'llama-3.3-70b-versatile' }),
@@ -151,9 +154,12 @@ describe('AiOrchestrationService', () => {
         template: 'Say hello to {{name}}',
         templateHash: 'hash-1',
       }),
+      findById: jest.fn().mockResolvedValue(null),
     };
     const agentRepository: jest.Mocked<IAgentRepository> = {
       findByKey: jest.fn().mockResolvedValue({ id: 'agent-1', key: 'test-agent' }),
+      findByCapability: jest.fn().mockResolvedValue(null),
+      appendCapability: jest.fn().mockResolvedValue(undefined),
     };
     const modelRegistryRepository: jest.Mocked<IModelRegistryRepository> = {
       findActiveForCapability: jest.fn().mockResolvedValue({ id: 'model-1', provider: 'groq', model: 'llama-3.3-70b-versatile' }),

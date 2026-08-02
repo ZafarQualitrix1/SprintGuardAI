@@ -10,6 +10,9 @@ export class SprintDto {
   @ApiProperty() source!: string;
   @ApiPropertyOptional({ nullable: true }) startDate!: string | null;
   @ApiPropertyOptional({ nullable: true }) endDate!: string | null;
+  @ApiProperty() canSync!: boolean;
+  @ApiPropertyOptional({ nullable: true }) lastSyncedAt!: string | null;
+  @ApiPropertyOptional({ nullable: true }) archivedAt!: string | null;
 }
 
 export class StoryDto {
@@ -25,4 +28,15 @@ export class StoryDto {
 
 export class SprintDetailDto extends SprintDto {
   @ApiProperty({ type: [StoryDto] }) stories!: StoryDto[];
+}
+
+export class SprintSyncEventDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() action!: string;
+  @ApiProperty() status!: string;
+  @ApiProperty() storiesCreated!: number;
+  @ApiProperty() storiesUpdated!: number;
+  @ApiPropertyOptional({ nullable: true }) errorMessage!: string | null;
+  @ApiPropertyOptional({ nullable: true }) triggeredBy!: string | null;
+  @ApiProperty() createdAt!: string;
 }

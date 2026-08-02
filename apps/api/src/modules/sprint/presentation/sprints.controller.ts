@@ -1,15 +1,23 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { ImportSprintFromJiraCommand } from '../application/commands/import-sprint-from-jira.command';
+import { SyncSprintCommand } from '../application/commands/sync-sprint.command';
+import { OverrideSprintCommand } from '../application/commands/override-sprint.command';
+import { RenameSprintCommand } from '../application/commands/rename-sprint.command';
+import { ArchiveSprintCommand } from '../application/commands/archive-sprint.command';
+import { DeleteSprintCommand } from '../application/commands/delete-sprint.command';
 import { ListSprintsQuery } from '../application/queries/list-sprints.query';
 import { GetSprintQuery } from '../application/queries/get-sprint.query';
-import { SprintEntity, SprintWithStories } from '../domain/entities/sprint.entity';
+import { GetSprintSyncHistoryQuery } from '../application/queries/get-sprint-sync-history.query';
+import { SprintEntity, SprintSyncEventEntity, SprintWithStories } from '../domain/entities/sprint.entity';
 import { StoryEntity } from '../domain/entities/story.entity';
-import { SprintDetailDto, SprintDto, StoryDto } from './dto/sprint.dto';
+import { SprintDetailDto, SprintDto, SprintSyncEventDto, StoryDto } from './dto/sprint.dto';
 import { ImportJiraSprintDto } from './dto/import-jira-sprint.dto';
+import { RenameSprintDto } from './dto/rename-sprint.dto';
+import { ArchiveSprintDto } from './dto/archive-sprint.dto';
 
 function toSprintDto(entity: SprintEntity): SprintDto {
   return {
@@ -22,6 +30,9 @@ function toSprintDto(entity: SprintEntity): SprintDto {
     source: entity.source,
     startDate: entity.startDate?.toISOString() ?? null,
     endDate: entity.endDate?.toISOString() ?? null,
+    canSync: entity.sourceConnectionId !== null,
+    lastSyncedAt: entity.lastSyncedAt?.toISOString() ?? null,
+    archivedAt: entity.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -40,6 +51,19 @@ function toStoryDto(entity: StoryEntity): StoryDto {
 
 function toSprintDetailDto(result: SprintWithStories): SprintDetailDto {
   return { ...toSprintDto(result.sprint), stories: result.stories.map(toStoryDto) };
+}
+
+function toSyncEventDto(entity: SprintSyncEventEntity): SprintSyncEventDto {
+  return {
+    id: entity.id,
+    action: entity.action,
+    status: entity.status,
+    storiesCreated: entity.storiesCreated,
+    storiesUpdated: entity.storiesUpdated,
+    errorMessage: entity.errorMessage,
+    triggeredBy: entity.triggeredBy,
+    createdAt: entity.createdAt.toISOString(),
+  };
 }
 
 @ApiTags('Sprints')
@@ -74,6 +98,18 @@ export class SprintsController {
     return toSprintDetailDto(result);
   }
 
+  @Get(':id/sync-history')
+  @RequirePermission('sprint:read')
+  async syncHistory(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SprintSyncEventDto[]> {
+    const events = await this.queryBus.execute<GetSprintSyncHistoryQuery, SprintSyncEventEntity[]>(
+      new GetSprintSyncHistoryQuery(user.organizationId, id),
+    );
+    return events.map(toSyncEventDto);
+  }
+
   @Post('import/jira')
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission('sprint:write')
@@ -82,8 +118,70 @@ export class SprintsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SprintDetailDto> {
     const result = await this.commandBus.execute<ImportSprintFromJiraCommand, SprintWithStories>(
-      new ImportSprintFromJiraCommand(user.organizationId, dto.projectId, dto.connectionId, dto.reference),
+      new ImportSprintFromJiraCommand(user.organizationId, dto.projectId, dto.connectionId, dto.reference, user.userId),
     );
     return toSprintDetailDto(result);
+  }
+
+  @Post(':id/sync')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('sprint:write')
+  async sync(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SprintDetailDto> {
+    const result = await this.commandBus.execute<SyncSprintCommand, SprintWithStories>(
+      new SyncSprintCommand(user.organizationId, user.userId, id),
+    );
+    return toSprintDetailDto(result);
+  }
+
+  @Post(':id/override')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('sprint:write')
+  async override(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SprintDetailDto> {
+    const result = await this.commandBus.execute<OverrideSprintCommand, SprintWithStories>(
+      new OverrideSprintCommand(user.organizationId, user.userId, id),
+    );
+    return toSprintDetailDto(result);
+  }
+
+  @Patch(':id')
+  @RequirePermission('sprint:write')
+  async rename(
+    @Param('id') id: string,
+    @Body() dto: RenameSprintDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SprintDto> {
+    const sprint = await this.commandBus.execute<RenameSprintCommand, SprintEntity>(
+      new RenameSprintCommand(user.organizationId, user.userId, id, dto.name),
+    );
+    return toSprintDto(sprint);
+  }
+
+  @Post(':id/archive')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('sprint:write')
+  async archive(
+    @Param('id') id: string,
+    @Body() dto: ArchiveSprintDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<SprintDto> {
+    const sprint = await this.commandBus.execute<ArchiveSprintCommand, SprintEntity>(
+      new ArchiveSprintCommand(user.organizationId, user.userId, id, dto.archived),
+    );
+    return toSprintDto(sprint);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission('sprint:write')
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.commandBus.execute<DeleteSprintCommand, void>(
+      new DeleteSprintCommand(user.organizationId, user.userId, id),
+    );
   }
 }
