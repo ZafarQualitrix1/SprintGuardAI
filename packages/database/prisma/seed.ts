@@ -244,6 +244,9 @@ async function main() {
   const PROMPTS = [
     {
       capability: 'requirement-intelligence',
+      name: 'Requirement Intelligence',
+      description: 'Extracts functional/non-functional requirements and Given/When/Then acceptance criteria from a story.',
+      category: 'Requirement Intelligence',
       template: [
         'You are a senior business analyst. Given a user story, extract clear requirements and',
         'Given/When/Then acceptance criteria.',
@@ -289,6 +292,9 @@ async function main() {
     },
     {
       capability: 'test-scenario',
+      name: 'Test Scenario Generation',
+      description: 'Generates distinct test scenarios (happy path + edge cases) from a single acceptance criterion.',
+      category: 'Test Scenario Generation',
       template: [
         'You are a senior QA engineer. Given one acceptance criterion, generate distinct test',
         'scenarios covering the happy path and meaningful edge cases.',
@@ -321,6 +327,9 @@ async function main() {
     },
     {
       capability: 'test-case',
+      name: 'Test Case Generation',
+      description: 'Expands a test scenario into an executable test case with concrete steps and expected results.',
+      category: 'Test Case Generation',
       template: [
         'You are a senior QA engineer. Given a test scenario, produce a detailed, executable test',
         'case with concrete steps and expected results.',
@@ -361,6 +370,9 @@ async function main() {
     },
     {
       capability: 'release-readiness-summary',
+      name: 'Release Readiness Executive Summary',
+      description: 'Writes an executive narrative summary and highlights from computed release readiness metrics.',
+      category: 'Release Readiness',
       template: [
         'You are a release manager preparing an executive summary for stakeholders. Given the',
         'computed release readiness metrics below, write a concise, factual summary and a short',
@@ -384,6 +396,9 @@ async function main() {
     },
     {
       capability: 'coverage-recommendation',
+      name: 'Coverage Gap Recommendation',
+      description: 'Reviews computed coverage gaps and suggests additional test scenarios to close them.',
+      category: 'Coverage Analysis',
       template: [
         'You are a senior QA lead reviewing test coverage for a sprint. Given the computed coverage',
         'gaps below, suggest specific additional test scenarios to close them, and rate overall',
@@ -425,6 +440,9 @@ async function main() {
     },
     {
       capability: 'deep-requirement-analysis',
+      name: 'Deep Requirement Analysis',
+      description: 'Full BA/QA-architect analysis of a Jira story: risks, edge cases, API/DB/UI impact, enterprise test cases, and self-assessed coverage.',
+      category: 'Deep Requirement Analysis',
       template: [
         'You are acting as a Senior Business Analyst, QA Architect, Automation Architect, and Product',
         'Owner reviewing a single Jira user story in full detail. Read the story context below',
@@ -568,6 +586,9 @@ async function main() {
         isActive: true,
         templateHash,
         createdBy: 'system-seed',
+        name: prompt.name,
+        description: prompt.description,
+        category: prompt.category,
       },
       update: {
         template: prompt.template,
@@ -575,6 +596,9 @@ async function main() {
         templateHash,
         isActive: true,
         status: 'ACTIVE',
+        name: prompt.name,
+        description: prompt.description,
+        category: prompt.category,
       },
     });
   }

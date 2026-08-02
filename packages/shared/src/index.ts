@@ -10,3 +10,4 @@ export * from './schemas/coverage';
 export * from './schemas/execution';
 export * from './schemas/release';
 export * from './schemas/ai-settings';
+export * from './schemas/prompt-management';

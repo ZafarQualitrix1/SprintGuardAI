@@ -70,6 +70,9 @@ import {
     { provide: MODULE_AI_CONFIG_REPOSITORY, useClass: PrismaModuleAiConfigRepository },
     { provide: AI_PROVIDER_STATS_REPOSITORY, useClass: PrismaAiProviderStatsRepository },
   ],
-  exports: [AiOrchestrationService],
+  // AGENT_REPOSITORY additionally exported for Prompt Management (capability<->agent lookups when
+  // creating/activating prompts and resolving the Playground's agent) -- everything else stays
+  // private to this module, consumers should go through AiOrchestrationService.
+  exports: [AiOrchestrationService, AGENT_REPOSITORY],
 })
 export class AiModule {}

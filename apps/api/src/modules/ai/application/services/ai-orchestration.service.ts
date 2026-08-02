@@ -39,6 +39,10 @@ export interface ExecuteAgentParams<T> {
   outputSchema: ZodType<T, any, any>;
   correlationId?: string;
   provider?: string;
+  // Prompt Management Playground: test a specific prompt version (any status, not just the
+  // capability's active one) instead of looking it up by capability. Everything else -- retry,
+  // fallback, persistence -- runs identically, so a playground test reflects real behavior.
+  promptOverride?: string;
 }
 
 export interface ExecuteAgentResult<T> {
@@ -102,12 +106,18 @@ export class AiOrchestrationService {
     const provider = effective.provider;
 
     const [prompt, agent] = await Promise.all([
-      this.promptRepository.findActiveByCapability(params.capability),
+      params.promptOverride
+        ? this.promptRepository.findById(params.promptOverride)
+        : this.promptRepository.findActiveByCapability(params.capability),
       this.agentRepository.findByKey(params.agentKey),
     ]);
 
     if (!prompt) {
-      throw new NotFoundException(`No active prompt for capability "${params.capability}"`);
+      throw new NotFoundException(
+        params.promptOverride
+          ? `Prompt "${params.promptOverride}" not found`
+          : `No active prompt for capability "${params.capability}"`,
+      );
     }
     if (!agent) {
       throw new NotFoundException(`Unknown agent "${params.agentKey}". Run \`pnpm db:seed\`.`);

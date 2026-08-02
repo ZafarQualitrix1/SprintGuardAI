@@ -10,4 +10,20 @@ export class PrismaAgentRepository implements IAgentRepository {
     const row = await this.prisma.agent.findUnique({ where: { key } });
     return row ? { id: row.id, key: row.key } : null;
   }
+
+  async findByCapability(capability: string) {
+    const row = await this.prisma.agent.findFirst({ where: { capabilities: { array_contains: capability } } });
+    return row ? { id: row.id, key: row.key } : null;
+  }
+
+  async appendCapability(agentId: string, capability: string) {
+    const row = await this.prisma.agent.findUniqueOrThrow({ where: { id: agentId } });
+    const capabilities = (row.capabilities as string[]) ?? [];
+    if (!capabilities.includes(capability)) {
+      await this.prisma.agent.update({
+        where: { id: agentId },
+        data: { capabilities: [...capabilities, capability] },
+      });
+    }
+  }
 }

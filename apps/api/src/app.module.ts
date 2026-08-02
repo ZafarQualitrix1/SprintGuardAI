@@ -28,6 +28,7 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { AiModule } from './modules/ai/ai.module';
 import { AiGovernanceModule } from './modules/ai-governance/ai-governance.module';
 import { AiOpsModule } from './modules/ai-ops/ai-ops.module';
+import { PromptManagementModule } from './modules/prompt-management/prompt-management.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { IntegrationModule } from './modules/integration/integration.module';
@@ -81,6 +82,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     AiModule,
     AiGovernanceModule,
     AiOpsModule,
+    PromptManagementModule,
     KnowledgeModule,
     DocumentsModule,
     IntegrationModule,

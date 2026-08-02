@@ -14,6 +14,26 @@ export class SprintEntity {
     public readonly source: SprintSource,
     public readonly startDate: Date | null,
     public readonly endDate: Date | null,
+    public readonly sourceConnectionId: string | null,
+    public readonly lastSyncedAt: Date | null,
+    public readonly archivedAt: Date | null,
+  ) {}
+}
+
+export type SprintSyncAction = 'IMPORT' | 'SYNC' | 'OVERRIDE' | 'RENAME' | 'ARCHIVE' | 'UNARCHIVE' | 'DELETE';
+export type SprintSyncStatus = 'SUCCESS' | 'FAILED';
+
+export class SprintSyncEventEntity {
+  constructor(
+    public readonly id: string,
+    public readonly sprintId: string,
+    public readonly action: SprintSyncAction,
+    public readonly status: SprintSyncStatus,
+    public readonly storiesCreated: number,
+    public readonly storiesUpdated: number,
+    public readonly errorMessage: string | null,
+    public readonly triggeredBy: string | null,
+    public readonly createdAt: Date,
   ) {}
 }
 

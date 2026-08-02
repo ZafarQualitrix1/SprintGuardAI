@@ -1,4 +1,11 @@
-import { SprintEntity, SprintSource, SprintWithStories } from '../entities/sprint.entity';
+import {
+  SprintEntity,
+  SprintSource,
+  SprintSyncAction,
+  SprintSyncEventEntity,
+  SprintSyncStatus,
+  SprintWithStories,
+} from '../entities/sprint.entity';
 import { StoryStatus } from '../entities/story.entity';
 
 export const SPRINT_REPOSITORY = Symbol('ISprintRepository');
@@ -13,7 +20,7 @@ export interface CreateStoryInput {
   assignee: string | null;
 }
 
-export interface CreateSprintWithStoriesInput {
+export interface UpsertSprintWithStoriesInput {
   projectId: string;
   externalId: string | null;
   name: string;
@@ -26,9 +33,46 @@ export interface CreateSprintWithStoriesInput {
   sourceConnectionId?: string | null;
 }
 
+export interface SprintSyncResult {
+  sprintWithStories: SprintWithStories;
+  storiesCreated: number;
+  storiesUpdated: number;
+  wasNewSprint: boolean;
+}
+
+export interface RecordSyncEventInput {
+  sprintId: string;
+  organizationId: string;
+  action: SprintSyncAction;
+  status: SprintSyncStatus;
+  storiesCreated?: number;
+  storiesUpdated?: number;
+  errorMessage?: string | null;
+  triggeredBy?: string | null;
+}
+
 export interface ISprintRepository {
-  /** Sprint aggregate transaction (Solution Architecture §2): Sprint + all Stories commit atomically. */
-  createWithStories(input: CreateSprintWithStoriesInput): Promise<SprintWithStories>;
+  /** First-time import OR idempotent re-sync: finds an existing sprint by (projectId, externalId)
+   * and updates it, upserting its stories by (sprintId, externalId), rather than creating a
+   * duplicate Sprint/Story every time the same Jira sprint is imported again. Never deletes a
+   * Story row, so every AI-generated child (Requirement/TestScenario/TestCase/
+   * CoverageMatrixEntry/Execution/Defect/RequirementAnalysisReport -- all cascade from Story) is
+   * preserved automatically; only the Jira-sourced fields on existing rows are overwritten. */
+  upsertWithStories(input: UpsertSprintWithStoriesInput): Promise<SprintSyncResult>;
+
+  /** Explicit full refresh ("Override Existing Sprint"): deletes every Story for the sprint --
+   * cascading away all AI-generated data with it -- then recreates fresh from the latest Jira
+   * payload. Only reachable via a user-confirmed destructive action, never from a normal sync. */
+  overrideWithStories(sprintId: string, input: UpsertSprintWithStoriesInput): Promise<SprintSyncResult>;
+
   findByIdWithStories(id: string, organizationId: string): Promise<SprintWithStories | null>;
+  /** Excludes soft-deleted and archived sprints -- matches the sprint list/card view. */
   listByProject(projectId: string, organizationId: string): Promise<SprintEntity[]>;
+
+  rename(id: string, organizationId: string, name: string): Promise<SprintEntity>;
+  setArchived(id: string, organizationId: string, archived: boolean): Promise<SprintEntity>;
+  softDelete(id: string, organizationId: string): Promise<void>;
+
+  recordSyncEvent(input: RecordSyncEventInput): Promise<void>;
+  listSyncEvents(sprintId: string, organizationId: string): Promise<SprintSyncEventEntity[]>;
 }

@@ -21,6 +21,7 @@ export class ImportSprintFromJiraCommand {
     public readonly projectId: string,
     public readonly connectionId: string,
     public readonly reference: string,
+    public readonly actorId: string,
   ) {}
 }
 
@@ -75,7 +76,10 @@ export class ImportSprintFromJiraHandler
       assignee: story.assignee,
     }));
 
-    const result = await this.sprintRepository.createWithStories({
+    // Idempotent: re-importing a sprint whose Jira ID already exists updates it in place (and
+    // upserts each story by externalId) instead of creating a duplicate -- see
+    // ISprintRepository.upsertWithStories for why this never touches AI-generated data.
+    const result = await this.sprintRepository.upsertWithStories({
       projectId: project.id,
       externalId: externalSprint.externalId,
       name: externalSprint.name,
@@ -87,10 +91,25 @@ export class ImportSprintFromJiraHandler
       sourceConnectionId: command.connectionId,
     });
 
+    await this.sprintRepository.recordSyncEvent({
+      sprintId: result.sprintWithStories.sprint.id,
+      organizationId: command.organizationId,
+      action: result.wasNewSprint ? 'IMPORT' : 'SYNC',
+      status: 'SUCCESS',
+      storiesCreated: result.storiesCreated,
+      storiesUpdated: result.storiesUpdated,
+      triggeredBy: command.actorId,
+    });
+
     this.eventBus.publish(
-      new SprintImportedEvent(result.sprint.id, project.id, command.organizationId, stories.length),
+      new SprintImportedEvent(
+        result.sprintWithStories.sprint.id,
+        project.id,
+        command.organizationId,
+        stories.length,
+      ),
     );
 
-    return result;
+    return result.sprintWithStories;
   }
 }

@@ -200,6 +200,12 @@ model Sprint {
   // Jira credentials for a deep re-fetch at analysis time. SetNull (not Cascade): deleting the
   // Jira connection must never take historical sprints/stories with it.
   sourceConnectionId String?
+  // Sync/lifecycle metadata. archivedAt/deletedAt are soft-state (same pattern as Organization/
+  // Project), not enum values on SprintStatus, so archiving/deleting never collides with the
+  // Jira-mirrored PLANNED/ACTIVE/COMPLETED/CANCELLED status.
+  lastSyncedAt       DateTime?
+  archivedAt         DateTime?
+  deletedAt          DateTime?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -212,10 +218,47 @@ model Sprint {
   gaps             Gap[]
   executions       Execution[]
   sprintMemory     SprintMemory?
+  syncEvents       SprintSyncEvent[]
 
+  @@unique([projectId, externalId])
   @@index([projectId])
   @@index([projectId, status])
   @@index([sourceConnectionId])
+}
+
+enum SprintSyncAction {
+  IMPORT
+  SYNC
+  OVERRIDE
+  RENAME
+  ARCHIVE
+  UNARCHIVE
+  DELETE
+}
+
+enum SprintSyncStatus {
+  SUCCESS
+  FAILED
+}
+
+// Audit trail backing both "View Import History" and "View Synchronization Logs" -- one event
+// stream, since an import is just the first sync. Kept even if the sprint itself is later deleted
+// is NOT required here (cascades with the sprint), unlike AuditLog which is org-level and durable.
+model SprintSyncEvent {
+  id             String           @id @default(cuid())
+  sprintId       String
+  organizationId String
+  action         SprintSyncAction
+  status         SprintSyncStatus @default(SUCCESS)
+  storiesCreated Int              @default(0)
+  storiesUpdated Int              @default(0)
+  errorMessage   String?
+  triggeredBy    String?
+  createdAt      DateTime         @default(now())
+
+  sprint Sprint @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+
+  @@index([sprintId, createdAt])
 }
 
 // ============================================================================
@@ -256,6 +299,7 @@ model Story {
 
   @@index([sprintId])
   @@index([sprintId, status])
+  @@unique([sprintId, externalId])
 }
 
 // Deep, Groq-generated business-analyst/QA-architect report for a single story: risks, edge
@@ -685,18 +729,26 @@ enum PromptStatus {
 }
 
 model AiPrompt {
-  id           String       @id @default(cuid())
-  capability   String // e.g. "test-scenario-generation"
-  version      String
-  template     String
-  jsonSchema   Json
-  model        String?
-  status       PromptStatus @default(DRAFT)
-  isActive     Boolean      @default(false)
-  templateHash String
-  createdBy    String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  capability    String // e.g. "test-scenario-generation"
+  version       String
+  template      String
+  jsonSchema    Json
+  model         String?
+  status        PromptStatus @default(DRAFT)
+  isActive      Boolean      @default(false)
+  templateHash  String
+  createdBy     String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  // Prompt Management (admin-facing) fields -- deliberately nullable since the 6 seed-created
+  // prompts predate this module; backfilled lazily on first edit, not required for the runtime
+  // execution path (AiOrchestrationService never reads these).
+  name          String?
+  description   String?
+  category      String?
+  tags          Json? // string[]
+  changeSummary String? // what changed in this version vs. the previous one
 
   approvals   PromptApproval[]
   aiResponses AiResponse[]

@@ -10,4 +10,6 @@ export interface ActivePrompt {
 
 export interface IAiPromptRepository {
   findActiveByCapability(capability: string): Promise<ActivePrompt | null>;
+  /** Any status, not just active -- lets Prompt Playground test a DRAFT version before activation. */
+  findById(id: string): Promise<ActivePrompt | null>;
 }
