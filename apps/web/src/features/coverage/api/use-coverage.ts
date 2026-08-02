@@ -22,3 +22,22 @@ export function useComputeCoverage(sprintId: string) {
     onSuccess: (result) => queryClient.setQueryData(['coverage', sprintId], result),
   });
 }
+
+// GET .../stories/:storyId/coverage always recomputes live (no persistence step -- see
+// GetStoryCoverageHandler's comment), so unlike sprint-level coverage above, a plain refetch here
+// is always safe and cheap; only aiRecommendation is compute-only, same caveat as above.
+export function useStoryCoverage(storyId: string | null) {
+  return useQuery({
+    queryKey: ['coverage', 'story', storyId],
+    queryFn: () => coverageApi.getForStory(storyId as string),
+    enabled: Boolean(storyId),
+  });
+}
+
+export function useComputeStoryCoverage(storyId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => coverageApi.computeForStory(storyId as string),
+    onSuccess: (result) => queryClient.setQueryData(['coverage', 'story', storyId], result),
+  });
+}

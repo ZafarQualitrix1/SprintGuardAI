@@ -13,6 +13,8 @@ const PERMISSIONS = [
   { key: 'requirement:write', description: 'Edit requirements and acceptance criteria' },
   { key: 'test:read', description: 'View test scenarios and test cases' },
   { key: 'test:write', description: 'Generate/edit test scenarios and test cases' },
+  { key: 'test:approve', description: 'Approve/reject BA review cycles for AI-generated test cases' },
+  { key: 'test:admin-unlock', description: 'Unlock a BA-approved story to allow AI test regeneration again' },
   { key: 'coverage:read', description: 'View coverage matrix and gap analysis' },
   { key: 'coverage:write', description: 'Compute/recompute coverage matrix and gap analysis' },
   { key: 'execution:read', description: 'View test execution results' },
@@ -42,6 +44,7 @@ const ROLES: Record<string, { name: string; permissions: string[] }> = {
       'sprint:read', 'sprint:write', 'requirement:read', 'requirement:write',
       'test:read', 'test:write', 'coverage:read', 'coverage:write', 'execution:read', 'execution:write',
       'automation:read', 'automation:write', 'release:read', 'release:publish', 'integration:manage',
+      'test:admin-unlock',
     ],
   },
   QA_LEAD: {
@@ -59,9 +62,17 @@ const ROLES: Record<string, { name: string; permissions: string[] }> = {
       'execution:read', 'execution:write', 'automation:read', 'automation:write',
     ],
   },
+  BUSINESS_ANALYST: {
+    name: 'Business Analyst',
+    // Reviews/approves AI-generated test cases (BA Review Workflow); read-only everywhere else in
+    // this bounded context -- test:write (generation) stays QA Engineer/Lead-only.
+    permissions: ['sprint:read', 'requirement:read', 'test:read', 'test:approve', 'coverage:read'],
+  },
   PRODUCT_MANAGER: {
     name: 'Product Manager',
-    permissions: ['sprint:read', 'requirement:read', 'requirement:write', 'coverage:read', 'release:read'],
+    // test:read added for the BA Review Workflow's "others view-only" rule -- POs are notified on
+    // final approval and need to view the (read-only) BA Review Status panel.
+    permissions: ['sprint:read', 'requirement:read', 'requirement:write', 'test:read', 'coverage:read', 'release:read'],
   },
   ENGINEER: {
     name: 'Engineer',
@@ -177,7 +188,7 @@ async function main() {
       costTier: 'cheap',
       allowedCapabilities: [
         'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
-        'deep-requirement-analysis', 'playwright-api-automation', 'playwright-ui-automation',
+        'deep-requirement-analysis', 'playwright-api-automation', 'playwright-ui-automation', 'test-case-improvement',
       ],
     },
   ] as const;
@@ -251,6 +262,15 @@ async function main() {
         'API/DB/UI impact, enterprise test cases, and self-assessed coverage.',
       version: '1.0.0',
       capabilities: ['deep-requirement-analysis'],
+    },
+    {
+      key: 'test-case-improvement-agent',
+      name: 'Test Case Improvement Agent',
+      description:
+        'BA Review Workflow: merges a Business Analyst\'s Jira feedback with the existing test-case ' +
+        'baseline and returns a targeted add/modify/remove changeset plus an improvement summary.',
+      version: '1.0.0',
+      capabilities: ['test-case-improvement'],
     },
   ] as const;
 
@@ -747,6 +767,69 @@ async function main() {
               riskCoveragePct: { type: 'number' },
               overallPct: { type: 'number' },
               uncovered: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    {
+      capability: 'test-case-improvement',
+      name: 'Test Case Improvement (BA Feedback Merge)',
+      description: 'Merges a Business Analyst\'s Jira reply with the existing test-case baseline into a targeted add/modify/remove changeset.',
+      category: 'BA Review Workflow',
+      template: [
+        'You are a senior QA architect updating an existing, BA-reviewed test-case suite based on new',
+        'feedback from the Business Analyst. Treat the BA feedback as ADDITIONAL business requirements,',
+        'not a replacement of the story -- change only what the feedback actually requires and leave',
+        'every other correct test case untouched.',
+        '',
+        'Story title: {{storyTitle}}',
+        'Story description: {{storyDescription}}',
+        'Previous requirement analysis (JSON, may be "Not available."): {{previousRequirementAnalysisJson}}',
+        'Previous test cases baseline (JSON array of {scenarioId, scenarioTitle, testCases[]}): {{previousTestCasesJson}}',
+        'Business Analyst feedback (verbatim Jira reply): {{baFeedback}}',
+        'Previous document version: {{previousVersionLabel}}',
+        '',
+        'Decide precisely which existing test cases (by id, from the baseline above) need modification,',
+        'which are now obsolete and should be removed, and which brand-new test cases (attached to an',
+        'existing scenarioId from the baseline) need to be added to satisfy the feedback. Do NOT return',
+        'test cases that do not need to change.',
+        '',
+        'Respond with ONLY valid JSON (no markdown fences, no commentary) matching exactly this shape:',
+        '{"added":[{"scenarioId":string,"addReason":string,"title":string,"steps":[{"step":string,"expected":string}],',
+        '"priority":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL","description":string|null,"severity":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",',
+        '"module":string|null,"testType":string,"tags":string[],"automationStatus":"MANUAL"|"AUTOMATABLE"|"AUTOMATED",',
+        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null}],',
+        '"modified":[{"id":string,"changeReason":string,"title":string,"steps":[{"step":string,"expected":string}],',
+        '"priority":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL","description":string|null,"severity":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",',
+        '"module":string|null,"testType":string,"tags":string[],"automationStatus":"MANUAL"|"AUTOMATABLE"|"AUTOMATED",',
+        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null}],',
+        '"removed":[{"id":string,"reason":string}],',
+        '"improvementSummary":{"feedbackSummary":string,"coverageImpact":string,"automationReadinessImpact":string,"traceabilityImpact":string}}',
+        '',
+        'Rules:',
+        '- "id" values in modified/removed must be copied exactly from the previous test cases baseline.',
+        '- testType must be the single best fit from: FUNCTIONAL, NEGATIVE, BOUNDARY, VALIDATION,',
+        '  BUSINESS_RULE, API, UI, SECURITY, PERFORMANCE, ACCESSIBILITY, DATABASE, INTEGRATION,',
+        '  REGRESSION, SMOKE, SANITY.',
+        '- If the feedback requires no changes to any test case, return empty added/modified/removed',
+        '  arrays and explain why in improvementSummary.feedbackSummary.',
+      ].join('\n'),
+      jsonSchema: {
+        type: 'object',
+        required: ['added', 'modified', 'removed', 'improvementSummary'],
+        properties: {
+          added: { type: 'array' },
+          modified: { type: 'array' },
+          removed: { type: 'array' },
+          improvementSummary: {
+            type: 'object',
+            required: ['feedbackSummary', 'coverageImpact', 'automationReadinessImpact', 'traceabilityImpact'],
+            properties: {
+              feedbackSummary: { type: 'string' },
+              coverageImpact: { type: 'string' },
+              automationReadinessImpact: { type: 'string' },
+              traceabilityImpact: { type: 'string' },
             },
           },
         },

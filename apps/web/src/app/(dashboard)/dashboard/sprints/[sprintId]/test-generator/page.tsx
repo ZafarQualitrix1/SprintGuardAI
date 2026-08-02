@@ -40,7 +40,7 @@ export default function AiTestGeneratorPage() {
       ) : (
         <div className="space-y-4">
           {sprint.stories.map((story) => (
-            <StoryTestGeneratorCard key={story.id} story={story} />
+            <StoryTestGeneratorCard key={story.id} story={story} sprintId={params.sprintId} />
           ))}
         </div>
       )}

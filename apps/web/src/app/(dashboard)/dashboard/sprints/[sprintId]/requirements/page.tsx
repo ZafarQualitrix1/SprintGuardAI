@@ -40,7 +40,7 @@ export default function RequirementIntelligencePage() {
       ) : (
         <div className="space-y-4">
           {sprint.stories.map((story) => (
-            <StoryRequirementsCard key={story.id} story={story} />
+            <StoryRequirementsCard key={story.id} story={story} sprintId={params.sprintId} />
           ))}
         </div>
       )}

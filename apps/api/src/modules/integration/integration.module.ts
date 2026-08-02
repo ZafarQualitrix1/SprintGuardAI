@@ -33,6 +33,9 @@ import { PrismaIntegrationConnectionRepository } from './infrastructure/reposito
       inject: [JiraConnectorService],
     },
   ],
-  exports: [],
+  // AuditLogService exported for ba-review's approve/admin-unlock commands to reuse directly
+  // (same "shared provider" precedent as AiModule exporting AGENT_REPOSITORY) instead of
+  // duplicating audit-log-writing code in a second module.
+  exports: [AuditLogService],
 })
 export class IntegrationModule {}

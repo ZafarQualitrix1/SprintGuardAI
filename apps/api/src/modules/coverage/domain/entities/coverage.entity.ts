@@ -56,3 +56,57 @@ export class CoverageResultEntity {
     public readonly computedAt: Date | null,
   ) {}
 }
+
+// Category coverage isn't stored anywhere -- it's derived on every read straight from
+// TestCase.testType/automationStatus (see deriveStoryCoverage), which is why the story-scoped GET
+// query has no persistence step at all (see get-story-coverage.query.ts).
+export interface CoverageDimensions {
+  requirementCoverage: number;
+  acceptanceCriteriaCoverage: number;
+  functionalCoverage: number;
+  apiCoverage: number;
+  uiCoverage: number;
+  securityCoverage: number;
+  performanceCoverage: number;
+  accessibilityCoverage: number;
+  automationCoverage: number;
+  manualCoverage: number;
+}
+
+export interface TraceabilityTestCase {
+  id: string;
+  title: string;
+  testType: string;
+  automationStatus: string;
+}
+
+export interface TraceabilityAcceptanceCriterion {
+  id: string;
+  given: string;
+  when: string;
+  then: string;
+  testCases: TraceabilityTestCase[];
+}
+
+export interface TraceabilityRequirement {
+  requirementId: string;
+  requirementText: string;
+  acceptanceCriteria: TraceabilityAcceptanceCriterion[];
+}
+
+export class StoryCoverageResultEntity {
+  constructor(
+    public readonly storyId: string,
+    public readonly storyTitle: string,
+    public readonly summary: CoverageSummary,
+    public readonly dimensions: CoverageDimensions,
+    public readonly entries: CoverageMatrixEntryEntity[],
+    public readonly gaps: GapEntity[],
+    public readonly missingTestScenarios: string[],
+    public readonly missingEdgeCases: string[],
+    public readonly traceabilityMatrix: TraceabilityRequirement[],
+    // Same "compute-only, never persisted" semantics as CoverageResultEntity.aiRecommendation.
+    public readonly aiRecommendation: CoverageRecommendation | null,
+    public readonly computedAt: Date,
+  ) {}
+}

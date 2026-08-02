@@ -1,6 +1,9 @@
-import { BadRequestException, Inject } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { BadRequestException, ForbiddenException, Inject, Logger } from '@nestjs/common';
+import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
+import { TriggerBaReviewCommand } from '../../../ba-review/application/commands/trigger-ba-review.command';
+import { TestCaseSnapshotEntry } from '../../../ba-review/domain/entities/ba-review-cycle.entity';
 import {
   ACCEPTANCE_CRITERION_READ_REPOSITORY,
   IAcceptanceCriterionReadRepository,
@@ -20,20 +23,34 @@ export class RunTestGenerationCommand {
   constructor(
     public readonly organizationId: string,
     public readonly storyId: string,
+    public readonly actorId: string | null = null,
   ) {}
 }
 
 @CommandHandler(RunTestGenerationCommand)
 export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerationCommand, TestScenarioEntity[]> {
+  private readonly logger = new Logger(RunTestGenerationHandler.name);
+
   constructor(
     @Inject(ACCEPTANCE_CRITERION_READ_REPOSITORY)
     private readonly acceptanceCriterionReadRepository: IAcceptanceCriterionReadRepository,
     @Inject(TEST_SCENARIO_REPOSITORY) private readonly testScenarioRepository: ITestScenarioRepository,
     @Inject(TEST_CASE_REPOSITORY) private readonly testCaseRepository: ITestCaseRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly queryBus: QueryBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async execute(command: RunTestGenerationCommand): Promise<TestScenarioEntity[]> {
+    const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
+      new IsStoryLockedQuery(command.organizationId, command.storyId),
+    );
+    if (isLocked) {
+      throw new ForbiddenException(
+        'Test cases for this story are BA-approved and locked. An Admin must unlock it before regenerating.',
+      );
+    }
+
     const acceptanceCriteria = await this.acceptanceCriterionReadRepository.findByStoryId(
       command.storyId,
       command.organizationId,
@@ -47,6 +64,10 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
     // Sequential, not parallel: bounds concurrent load on the configured LLM provider and keeps
     // AgentRun ordering easy to follow in the audit trail. A story typically has a handful of ACs,
     // so this is an acceptable latency trade-off for MVP scope.
+    let lastProvider = '';
+    let lastModel = '';
+    let lastPromptVersion = '';
+
     for (const ac of acceptanceCriteria) {
       const scenarioResult = await this.aiOrchestrationService.execute({
         capability: 'test-scenario',
@@ -75,9 +96,48 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
         });
 
         await this.testCaseRepository.replaceForScenario(scenario.id, caseResult.data.cases);
+        lastProvider = caseResult.provider;
+        lastModel = caseResult.model;
+        lastPromptVersion = caseResult.promptVersion;
       }
     }
 
-    return this.testScenarioRepository.findByStoryId(command.storyId);
+    const finalScenarios = await this.testScenarioRepository.findByStoryId(command.storyId);
+
+    // BA Review Workflow: every fresh generation must be submitted for mandatory BA approval.
+    // Fire-and-forget -- Jira comment/attachment posting is a slower, network-flaky side effect
+    // that must never make this command's caller (the "Generate tests" HTTP request) fail or hang.
+    if (finalScenarios.length > 0) {
+      const testCasesSnapshot: TestCaseSnapshotEntry[] = finalScenarios.map((scenario) => ({
+        scenarioId: scenario.id,
+        scenarioTitle: scenario.title,
+        testCases: scenario.testCases.map((testCase) => ({
+          id: testCase.id,
+          title: testCase.title,
+          description: testCase.description,
+          steps: testCase.steps,
+          priority: testCase.priority,
+          severity: testCase.severity,
+          testType: testCase.testType,
+          automationStatus: testCase.automationStatus,
+        })),
+      }));
+
+      this.commandBus
+        .execute(
+          new TriggerBaReviewCommand(
+            command.organizationId,
+            command.storyId,
+            command.actorId,
+            testCasesSnapshot,
+            lastProvider,
+            lastModel,
+            lastPromptVersion,
+          ),
+        )
+        .catch((error) => this.logger.warn(`BA review submission failed for story ${command.storyId}: ${error}`));
+    }
+
+    return finalScenarios;
   }
 }

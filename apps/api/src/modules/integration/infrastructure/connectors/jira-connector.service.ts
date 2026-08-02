@@ -92,6 +92,7 @@ interface JiraIssueDetailFields {
 }
 
 interface JiraCommentResponse {
+  id: string;
   author?: { displayName?: string };
   body?: string | JiraAdfNode;
   created?: string;
@@ -102,6 +103,19 @@ interface JiraAttachmentResponse {
   mimeType?: string;
   size?: number;
   content?: string;
+}
+
+interface JiraCreatedCommentResponse {
+  id: string;
+}
+
+interface JiraCreatedAttachmentResponse {
+  id: string;
+}
+
+interface JiraUserSearchResult {
+  accountId: string;
+  displayName: string;
 }
 
 interface JiraIssueDetailResponse {
@@ -472,6 +486,7 @@ export class JiraConnectorService implements IIntegrationConnector {
 
     const comments: ExternalIssueCommentPayload[] = (fields.comment?.comments ?? [])
       .map((comment): ExternalIssueCommentPayload => ({
+        id: comment.id,
         author: comment.author?.displayName ?? null,
         body: adfToStructuredText(comment.body ?? null) ?? '',
         createdAt: toIsoDate(comment.created),
@@ -525,5 +540,94 @@ export class JiraConnectorService implements IIntegrationConnector {
       attachments,
       additionalCustomFields,
     };
+  }
+
+  // BA Review Workflow: posts an ADF comment (built by PostReviewCommentService, incl. any mention
+  // node) to the issue's comment thread. Jira Cloud v3 comments require ADF, not wiki markup.
+  async postComment(
+    externalId: string,
+    adfBody: unknown,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ commentId: string }> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+
+    const response = (await fetch(`${jiraConfig.siteUrl}/rest/api/3/issue/${encodeURIComponent(externalId)}/comment`, {
+      method: 'POST',
+      headers: {
+        Authorization: this.authHeader(jiraCredentials),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ body: adfBody }),
+    })) as unknown as FetchResponse;
+
+    if (!response.ok) {
+      throw new BadRequestException(`Could not post comment to Jira issue ${externalId} (HTTP ${response.status}).`);
+    }
+    const created = (await response.json()) as JiraCreatedCommentResponse;
+    return { commentId: created.id };
+  }
+
+  // BA Review Workflow: attaches the generated test-case document (Excel) to the issue. Jira's
+  // attachment endpoint requires the anti-CSRF "no-check" header and multipart/form-data -- it
+  // does not accept a raw JSON body like every other endpoint this connector calls.
+  async uploadAttachment(
+    externalId: string,
+    file: { filename: string; contentType: string; buffer: Buffer },
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ attachmentId: string }> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+
+    const form = new FormData();
+    form.append('file', new Blob([file.buffer], { type: file.contentType }), file.filename);
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/api/3/issue/${encodeURIComponent(externalId)}/attachments`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: this.authHeader(jiraCredentials),
+          Accept: 'application/json',
+          'X-Atlassian-Token': 'no-check',
+        },
+        body: form,
+      },
+    )) as unknown as FetchResponse;
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        `Could not upload attachment to Jira issue ${externalId} (HTTP ${response.status}).`,
+      );
+    }
+    const created = (await response.json()) as JiraCreatedAttachmentResponse[];
+    return { attachmentId: created[0].id };
+  }
+
+  // BA Review Workflow: resolves the assigned BA's email/name to a Jira accountId so the comment
+  // can use a real ADF mention node instead of plain "@name" text. Best-effort -- callers post the
+  // comment without a mention (never fail the whole post) when this returns null.
+  async resolveUserAccountId(
+    query: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ accountId: string; displayName: string } | null> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/api/3/user/search?query=${encodeURIComponent(query)}`,
+      { headers },
+    )) as unknown as FetchResponse;
+    if (!response.ok) {
+      return null;
+    }
+    const results = (await response.json()) as JiraUserSearchResult[];
+    const match = results[0];
+    return match ? { accountId: match.accountId, displayName: match.displayName } : null;
   }
 }

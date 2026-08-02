@@ -24,6 +24,19 @@ export interface ICoverageRepository {
     gaps: GapDraft[],
   ): Promise<void>;
 
+  /**
+   * Story-scoped recompute: replaces only this story's CoverageMatrixEntry/Gap rows (filtered via
+   * the requirement -> storyId relation), leaving every other story's rows in the same sprint
+   * untouched -- unlike replaceForSprint's blanket `deleteMany({ sprintId })`.
+   */
+  replaceForStory(
+    storyId: string,
+    sprintId: string,
+    projectId: string,
+    entries: CoverageMatrixEntryDraft[],
+    gaps: GapDraft[],
+  ): Promise<void>;
+
   /** Current matrix/gaps for a sprint with requirement text denormalized for display, or null if
    * coverage has never been computed for this sprint. `aiRecommendation` is always null here --
    * see CoverageResultEntity's comment. */

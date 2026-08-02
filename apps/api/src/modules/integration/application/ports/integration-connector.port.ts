@@ -54,6 +54,7 @@ export interface ExternalActiveSprintPayload {
 // populated customfield_* the connector didn't map to a named field above, so org-specific Jira
 // setups aren't silently dropped.
 export interface ExternalIssueCommentPayload {
+  id: string;
   author: string | null;
   body: string;
   createdAt: Date | null;
@@ -123,6 +124,26 @@ export interface IIntegrationConnector {
     credentials: ConnectorCredentials,
     config: Record<string, unknown>,
   ): Promise<ExternalIssueDetailPayload>;
+  /** Posts an ADF-formatted comment (BA Review Workflow) -- caller builds the ADF doc, incl. any mention nodes. */
+  postComment(
+    externalId: string,
+    adfBody: unknown,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ commentId: string }>;
+  /** Uploads a binary attachment (BA Review Workflow's generated test-case document) to an issue. */
+  uploadAttachment(
+    externalId: string,
+    file: { filename: string; contentType: string; buffer: Buffer },
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ attachmentId: string }>;
+  /** Resolves a user's Jira accountId (needed for ADF @mentions) by email or display name; null if no match. */
+  resolveUserAccountId(
+    query: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<{ accountId: string; displayName: string } | null>;
 }
 
 // Multi-provider injection token: integration.module.ts binds this to an array of every

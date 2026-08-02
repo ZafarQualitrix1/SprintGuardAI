@@ -50,6 +50,46 @@ export class PrismaCoverageRepository implements ICoverageRepository {
     ]);
   }
 
+  async replaceForStory(
+    storyId: string,
+    sprintId: string,
+    projectId: string,
+    entries: CoverageMatrixEntryDraft[],
+    gaps: GapDraft[],
+  ): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.coverageMatrixEntry.deleteMany({ where: { requirement: { storyId } } }),
+      this.prisma.gap.deleteMany({ where: { requirement: { storyId } } }),
+      ...(entries.length > 0
+        ? [
+            this.prisma.coverageMatrixEntry.createMany({
+              data: entries.map((entry) => ({
+                projectId,
+                sprintId,
+                requirementId: entry.requirementId,
+                testCaseId: entry.testCaseId,
+                coverageStatus: entry.coverageStatus,
+              })),
+            }),
+          ]
+        : []),
+      ...(gaps.length > 0
+        ? [
+            this.prisma.gap.createMany({
+              data: gaps.map((gap) => ({
+                projectId,
+                sprintId,
+                requirementId: gap.requirementId,
+                gapType: gap.gapType,
+                severity: gap.severity,
+                description: gap.description,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+  }
+
   async findBySprintId(sprintId: string): Promise<CoverageResultEntity | null> {
     const [entryRows, gapRows] = await Promise.all([
       this.prisma.coverageMatrixEntry.findMany({

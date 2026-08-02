@@ -45,3 +45,53 @@ export interface CoverageResult {
   aiRecommendation: CoverageRecommendation | null;
   computedAt: string | null;
 }
+
+export interface CoverageDimensions {
+  requirementCoverage: number;
+  acceptanceCriteriaCoverage: number;
+  functionalCoverage: number;
+  apiCoverage: number;
+  uiCoverage: number;
+  securityCoverage: number;
+  performanceCoverage: number;
+  accessibilityCoverage: number;
+  automationCoverage: number;
+  manualCoverage: number;
+}
+
+export interface TraceabilityTestCase {
+  id: string;
+  title: string;
+  testType: string;
+  automationStatus: string;
+}
+
+export interface TraceabilityAcceptanceCriterion {
+  id: string;
+  given: string;
+  when: string;
+  then: string;
+  testCases: TraceabilityTestCase[];
+}
+
+export interface TraceabilityRequirement {
+  requirementId: string;
+  requirementText: string;
+  acceptanceCriteria: TraceabilityAcceptanceCriterion[];
+}
+
+export interface StoryCoverageResult {
+  storyId: string;
+  storyTitle: string;
+  summary: CoverageSummary;
+  dimensions: CoverageDimensions;
+  entries: CoverageMatrixEntry[];
+  gaps: Gap[];
+  missingTestScenarios: string[];
+  missingEdgeCases: string[];
+  traceabilityMatrix: TraceabilityRequirement[];
+  // Only populated on the response returned directly from POST .../coverage/compute -- same
+  // never-persisted semantics as CoverageResult.aiRecommendation above.
+  aiRecommendation: CoverageRecommendation | null;
+  computedAt: string;
+}

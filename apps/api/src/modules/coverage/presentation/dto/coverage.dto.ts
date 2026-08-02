@@ -46,3 +46,52 @@ export class CoverageResultDto {
   aiRecommendation!: CoverageRecommendationDto | null;
   @ApiPropertyOptional({ nullable: true }) computedAt!: string | null;
 }
+
+export class CoverageDimensionsDto {
+  @ApiProperty() requirementCoverage!: number;
+  @ApiProperty() acceptanceCriteriaCoverage!: number;
+  @ApiProperty() functionalCoverage!: number;
+  @ApiProperty() apiCoverage!: number;
+  @ApiProperty() uiCoverage!: number;
+  @ApiProperty() securityCoverage!: number;
+  @ApiProperty() performanceCoverage!: number;
+  @ApiProperty() accessibilityCoverage!: number;
+  @ApiProperty() automationCoverage!: number;
+  @ApiProperty() manualCoverage!: number;
+}
+
+export class TraceabilityTestCaseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() title!: string;
+  @ApiProperty() testType!: string;
+  @ApiProperty() automationStatus!: string;
+}
+
+export class TraceabilityAcceptanceCriterionDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() given!: string;
+  @ApiProperty() when!: string;
+  @ApiProperty() then!: string;
+  @ApiProperty({ type: [TraceabilityTestCaseDto] }) testCases!: TraceabilityTestCaseDto[];
+}
+
+export class TraceabilityRequirementDto {
+  @ApiProperty() requirementId!: string;
+  @ApiProperty() requirementText!: string;
+  @ApiProperty({ type: [TraceabilityAcceptanceCriterionDto] }) acceptanceCriteria!: TraceabilityAcceptanceCriterionDto[];
+}
+
+export class StoryCoverageResultDto {
+  @ApiProperty() storyId!: string;
+  @ApiProperty() storyTitle!: string;
+  @ApiProperty({ type: CoverageSummaryDto }) summary!: CoverageSummaryDto;
+  @ApiProperty({ type: CoverageDimensionsDto }) dimensions!: CoverageDimensionsDto;
+  @ApiProperty({ type: [CoverageMatrixEntryDto] }) entries!: CoverageMatrixEntryDto[];
+  @ApiProperty({ type: [GapDto] }) gaps!: GapDto[];
+  @ApiProperty({ type: [String] }) missingTestScenarios!: string[];
+  @ApiProperty({ type: [String] }) missingEdgeCases!: string[];
+  @ApiProperty({ type: [TraceabilityRequirementDto] }) traceabilityMatrix!: TraceabilityRequirementDto[];
+  @ApiPropertyOptional({ type: CoverageRecommendationDto, nullable: true })
+  aiRecommendation!: CoverageRecommendationDto | null;
+  @ApiProperty() computedAt!: string;
+}

@@ -57,7 +57,7 @@ export class TestIntelligenceController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<TestScenarioDto[]> {
     const scenarios = await this.commandBus.execute<RunTestGenerationCommand, TestScenarioEntity[]>(
-      new RunTestGenerationCommand(user.organizationId, storyId),
+      new RunTestGenerationCommand(user.organizationId, storyId, user.userId),
     );
     return scenarios.map(toDto);
   }

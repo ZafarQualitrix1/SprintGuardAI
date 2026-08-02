@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,14 +10,23 @@ import {
   useGenerateRequirementAnalysis,
   useRequirementAnalysisReport,
 } from '@/features/requirement-intelligence/api';
+import { useBaReviewStatus } from '@/features/ba-review/api';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 import type { Story } from '@sprintguard/shared';
 import { StoryAnalysisReport } from './story-analysis-report';
 
-export function StoryRequirementsCard({ story }: { story: Pick<Story, 'id' | 'title'> }) {
+interface StoryRequirementsCardProps {
+  story: Pick<Story, 'id' | 'title'>;
+  /** Only passed from the sprint-list pages -- renders a "View full story" link; the detail page itself omits this. */
+  sprintId?: string;
+}
+
+export function StoryRequirementsCard({ story, sprintId }: StoryRequirementsCardProps) {
   const { data: report, isLoading } = useRequirementAnalysisReport(story.id);
   const generate = useGenerateRequirementAnalysis(story.id);
+  const { data: baStatus } = useBaReviewStatus(story.id);
+  const isLocked = baStatus?.isLocked ?? false;
 
   // A single backend call drives both the rich analysis shown here and (fire-and-forget, server
   // side) the lightweight Requirement/AcceptanceCriterion extraction the Coverage tab reads from
@@ -35,8 +45,20 @@ export function StoryRequirementsCard({ story }: { story: Pick<Story, 'id' | 'ti
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">{story.title}</CardTitle>
-        <Button size="sm" onClick={onAnalyze} disabled={generate.isPending}>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-base">{story.title}</CardTitle>
+          {sprintId ? (
+            <Link href={`/dashboard/sprints/${sprintId}/stories/${story.id}`} className="text-xs text-primary hover:underline">
+              View full story →
+            </Link>
+          ) : null}
+        </div>
+        <Button
+          size="sm"
+          onClick={onAnalyze}
+          disabled={generate.isPending || isLocked}
+          title={isLocked ? 'Test cases for this story are BA-approved and locked. An Admin must unlock it first.' : undefined}
+        >
           <Sparkles className="mr-2 h-4 w-4" />
           {generate.isPending ? 'Analyzing…' : report ? 'Re-analyze' : 'Analyze story'}
         </Button>

@@ -1,5 +1,8 @@
-import { CoverageSummary } from '../../domain/entities/coverage.entity';
-import { SprintCoverageSource } from '../../domain/repositories/coverage-source-read.repository.interface';
+import { CoverageDimensions, CoverageSummary, TraceabilityRequirement } from '../../domain/entities/coverage.entity';
+import {
+  SprintCoverageSource,
+  StoryCoverageSource,
+} from '../../domain/repositories/coverage-source-read.repository.interface';
 import { CoverageMatrixEntryDraft, GapDraft } from '../../domain/repositories/coverage.repository.interface';
 
 export interface DerivedCoverage {
@@ -13,7 +16,10 @@ export interface DerivedCoverage {
 // entry and at most one gap: a requirement with zero acceptance criteria can't also have a
 // "missing test" gap (there's nothing to test yet), so MISSING_AC and MISSING_TEST are mutually
 // exclusive per requirement.
-export function deriveCoverage(source: SprintCoverageSource): DerivedCoverage {
+// Narrowed to just `requirements` (not the full SprintCoverageSource) so the story-scoped source
+// -- whose `requirements` are a structurally-compatible superset shape, not the sprint one -- can
+// reuse this same core AC-coverage algorithm without a cast (see deriveStoryCoverage below).
+export function deriveCoverage(source: Pick<SprintCoverageSource, 'requirements'>): DerivedCoverage {
   const entries: CoverageMatrixEntryDraft[] = [];
   const gaps: GapDraft[] = [];
 
@@ -70,4 +76,107 @@ export function deriveCoverage(source: SprintCoverageSource): DerivedCoverage {
     gaps,
     summary: { totalRequirements, coveredCount, partiallyCoveredCount, notCoveredCount, coveragePercent },
   };
+}
+
+export interface DerivedStoryCoverage extends DerivedCoverage {
+  dimensions: CoverageDimensions;
+  missingTestScenarios: string[];
+  missingEdgeCases: string[];
+  traceabilityMatrix: TraceabilityRequirement[];
+}
+
+const CATEGORY_TEST_TYPES = {
+  functional: 'FUNCTIONAL',
+  api: 'API',
+  ui: 'UI',
+  security: 'SECURITY',
+  performance: 'PERFORMANCE',
+  accessibility: 'ACCESSIBILITY',
+} as const;
+
+function percent(numerator: number, denominator: number): number {
+  return denominator === 0 ? 0 : Math.round((numerator / denominator) * 100);
+}
+
+// Story-scoped variant of deriveCoverage above: same AC-coverage core (kept byte-identical in
+// spirit, not shared code, since the two source shapes differ), plus the dimension breakdown,
+// missing-edge-case heuristic, and traceability matrix that only make sense once the acceptance
+// criteria/test-case detail is available (the sprint-wide source deliberately only fetches test
+// case `id` -- fetching every test case's full detail across a whole sprint just to throw it away
+// would be wasteful, so that path is untouched).
+export function deriveStoryCoverage(source: StoryCoverageSource): DerivedStoryCoverage {
+  const { entries, gaps, summary } = deriveCoverage(source);
+
+  const missingEdgeCases: string[] = [];
+  const traceabilityMatrix: TraceabilityRequirement[] = [];
+
+  let acTotal = 0;
+  let acCovered = 0;
+  const categoryCovered: Record<keyof typeof CATEGORY_TEST_TYPES, number> = {
+    functional: 0,
+    api: 0,
+    ui: 0,
+    security: 0,
+    performance: 0,
+    accessibility: 0,
+  };
+  let totalTestCases = 0;
+  let automatedTestCases = 0;
+  let manualTestCases = 0;
+
+  for (const requirement of source.requirements) {
+    traceabilityMatrix.push({
+      requirementId: requirement.id,
+      requirementText: requirement.text,
+      acceptanceCriteria: requirement.acceptanceCriteria.map((ac) => ({
+        id: ac.id,
+        given: ac.given,
+        when: ac.when,
+        then: ac.then,
+        testCases: ac.testCases,
+      })),
+    });
+
+    for (const ac of requirement.acceptanceCriteria) {
+      acTotal += 1;
+      if (ac.hasTestCase) acCovered += 1;
+
+      const typesPresent = new Set(ac.testCases.map((tc) => tc.testType));
+      for (const [key, testType] of Object.entries(CATEGORY_TEST_TYPES) as [keyof typeof CATEGORY_TEST_TYPES, string][]) {
+        if (typesPresent.has(testType)) categoryCovered[key] += 1;
+      }
+
+      // Heuristic (not AI-derived): an AC with functional coverage but no NEGATIVE/BOUNDARY test
+      // case is flagged as missing edge-case coverage -- happy-path-only is a common, cheap-to-
+      // detect gap that doesn't need a model call to identify.
+      if (ac.testCases.length > 0 && !typesPresent.has('NEGATIVE') && !typesPresent.has('BOUNDARY')) {
+        missingEdgeCases.push(
+          `"${requirement.text}" has functional coverage but no negative/boundary edge-case tests.`,
+        );
+      }
+
+      for (const tc of ac.testCases) {
+        totalTestCases += 1;
+        if (tc.automationStatus === 'AUTOMATED') automatedTestCases += 1;
+        if (tc.automationStatus === 'MANUAL') manualTestCases += 1;
+      }
+    }
+  }
+
+  const dimensions: CoverageDimensions = {
+    requirementCoverage: summary.coveragePercent,
+    acceptanceCriteriaCoverage: percent(acCovered, acTotal),
+    functionalCoverage: percent(categoryCovered.functional, acTotal),
+    apiCoverage: percent(categoryCovered.api, acTotal),
+    uiCoverage: percent(categoryCovered.ui, acTotal),
+    securityCoverage: percent(categoryCovered.security, acTotal),
+    performanceCoverage: percent(categoryCovered.performance, acTotal),
+    accessibilityCoverage: percent(categoryCovered.accessibility, acTotal),
+    automationCoverage: percent(automatedTestCases, totalTestCases),
+    manualCoverage: percent(manualTestCases, totalTestCases),
+  };
+
+  const missingTestScenarios = gaps.filter((gap) => gap.gapType === 'MISSING_TEST').map((gap) => gap.description);
+
+  return { entries, gaps, summary, dimensions, missingTestScenarios, missingEdgeCases, traceabilityMatrix };
 }

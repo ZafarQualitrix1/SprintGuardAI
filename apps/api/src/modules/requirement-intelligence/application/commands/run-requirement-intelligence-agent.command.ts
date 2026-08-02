@@ -1,6 +1,7 @@
-import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   REQUIREMENT_REPOSITORY,
   IRequirementRepository,
@@ -27,9 +28,19 @@ export class RunRequirementIntelligenceAgentHandler
     @Inject(STORY_READ_REPOSITORY) private readonly storyReadRepository: IStoryReadRepository,
     @Inject(REQUIREMENT_REPOSITORY) private readonly requirementRepository: IRequirementRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly queryBus: QueryBus,
   ) {}
 
   async execute(command: RunRequirementIntelligenceAgentCommand): Promise<RequirementEntity[]> {
+    const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
+      new IsStoryLockedQuery(command.organizationId, command.storyId),
+    );
+    if (isLocked) {
+      throw new ForbiddenException(
+        'Test cases for this story are BA-approved and locked. An Admin must unlock it before regenerating requirements.',
+      );
+    }
+
     const story = await this.storyReadRepository.findById(command.storyId, command.organizationId);
     if (!story) {
       throw new NotFoundException('Story not found');

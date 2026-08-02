@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
-import { CoverageController } from './presentation/coverage.controller';
+import { CoverageController, StoryCoverageController } from './presentation/coverage.controller';
 
 import { COVERAGE_COMMAND_HANDLERS } from './application/commands';
 import { COVERAGE_QUERY_HANDLERS } from './application/queries';
@@ -16,7 +16,7 @@ import { PrismaCoverageRepository } from './infrastructure/repositories/prisma-c
 // AiModule for the best-effort coverage-recommendation narrative call.
 @Module({
   imports: [AiModule],
-  controllers: [CoverageController],
+  controllers: [CoverageController, StoryCoverageController],
   providers: [
     ...COVERAGE_COMMAND_HANDLERS,
     ...COVERAGE_QUERY_HANDLERS,

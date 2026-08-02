@@ -1,7 +1,8 @@
-import { BadRequestException, Inject, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 import { FetchExternalIssueDetailQuery } from '../../../integration/application/queries/fetch-external-issue-detail.query';
+import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import { ExternalIssueDetailPayload } from '../../../integration/application/ports/integration-connector.port';
 import {
   STORY_READ_REPOSITORY,
@@ -43,6 +44,15 @@ export class RunDeepRequirementAnalysisHandler
   ) {}
 
   async execute(command: RunDeepRequirementAnalysisCommand): Promise<RequirementAnalysisReportEntity> {
+    const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
+      new IsStoryLockedQuery(command.organizationId, command.storyId),
+    );
+    if (isLocked) {
+      throw new ForbiddenException(
+        'Test cases for this story are BA-approved and locked. An Admin must unlock it before re-analyzing.',
+      );
+    }
+
     const story = await this.storyReadRepository.findById(command.storyId, command.organizationId);
     if (!story) {
       throw new NotFoundException('Story not found');

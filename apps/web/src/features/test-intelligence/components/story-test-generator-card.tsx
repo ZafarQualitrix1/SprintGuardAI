@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Wand2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/empty-state';
 import { useGenerateTests, useTestScenarios } from '@/features/test-intelligence/api';
+import { useBaReviewStatus } from '@/features/ba-review/api';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 import type { Story } from '@sprintguard/shared';
@@ -18,9 +20,17 @@ const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'des
   CRITICAL: 'destructive',
 };
 
-export function StoryTestGeneratorCard({ story }: { story: Pick<Story, 'id' | 'title'> }) {
+interface StoryTestGeneratorCardProps {
+  story: Pick<Story, 'id' | 'title'>;
+  /** Only passed from the sprint-list pages -- renders a "View full story" link; the detail page itself omits this. */
+  sprintId?: string;
+}
+
+export function StoryTestGeneratorCard({ story, sprintId }: StoryTestGeneratorCardProps) {
   const { data: scenarios, isLoading } = useTestScenarios(story.id);
   const generate = useGenerateTests(story.id);
+  const { data: baStatus } = useBaReviewStatus(story.id);
+  const isLocked = baStatus?.isLocked ?? false;
 
   const onGenerate = () =>
     generate.mutate(undefined, {
@@ -36,8 +46,20 @@ export function StoryTestGeneratorCard({ story }: { story: Pick<Story, 'id' | 't
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">{story.title}</CardTitle>
-        <Button size="sm" onClick={onGenerate} disabled={generate.isPending}>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-base">{story.title}</CardTitle>
+          {sprintId ? (
+            <Link href={`/dashboard/sprints/${sprintId}/stories/${story.id}`} className="text-xs text-primary hover:underline">
+              View full story →
+            </Link>
+          ) : null}
+        </div>
+        <Button
+          size="sm"
+          onClick={onGenerate}
+          disabled={generate.isPending || isLocked}
+          title={isLocked ? 'Test cases for this story are BA-approved and locked. An Admin must unlock it first.' : undefined}
+        >
           <Wand2 className="mr-2 h-4 w-4" />
           {generate.isPending ? 'Generating…' : scenarios?.length ? 'Regenerate tests' : 'Generate tests'}
         </Button>

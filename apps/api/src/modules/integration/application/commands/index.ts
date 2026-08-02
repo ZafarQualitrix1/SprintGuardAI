@@ -7,6 +7,8 @@ export * from './set-default-connection.command';
 export * from './test-connection.command';
 export * from './sync-connection.command';
 export * from './verify-jira-credentials.command';
+export * from './post-issue-comment.command';
+export * from './upload-issue-attachment.command';
 
 import { ConnectJiraHandler } from './connect-jira.command';
 import { UpdateConnectionHandler } from './update-connection.command';
@@ -16,6 +18,8 @@ import { SetDefaultConnectionHandler } from './set-default-connection.command';
 import { TestConnectionHandler } from './test-connection.command';
 import { SyncConnectionHandler } from './sync-connection.command';
 import { VerifyJiraCredentialsHandler } from './verify-jira-credentials.command';
+import { PostIssueCommentHandler } from './post-issue-comment.command';
+import { UploadIssueAttachmentHandler } from './upload-issue-attachment.command';
 
 export const INTEGRATION_COMMAND_HANDLERS = [
   ConnectJiraHandler,
@@ -26,4 +30,6 @@ export const INTEGRATION_COMMAND_HANDLERS = [
   TestConnectionHandler,
   SyncConnectionHandler,
   VerifyJiraCredentialsHandler,
+  PostIssueCommentHandler,
+  UploadIssueAttachmentHandler,
 ];

@@ -1,0 +1,23 @@
+name: BA Review Sync
+
+# Polls every active BA review cycle's Jira comment thread for new BA replies (approval or
+# feedback) and drives the review workflow forward. Not a native Vercel Cron: Vercel's Hobby plan
+# caps cron jobs at once/day, which can't deliver a 5-minute cadence -- mirrors
+# integration-health-check.yml's GitHub Actions schedule exactly.
+# Requires the INTERNAL_CRON_SECRET repository secret (same value as the Vercel env var of the
+# same name on sprintguardai-api-uat).
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger BA review poll sweep
+        run: |
+          curl -sS -f -X POST \
+            https://sprintguardai-api-uat.vercel.app/api/v1/internal/ba-review/poll-sweep \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_CRON_SECRET }}"

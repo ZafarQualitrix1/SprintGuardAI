@@ -24,6 +24,10 @@ import { PrismaTestCaseRepository } from './infrastructure/repositories/prisma-t
     { provide: TEST_SCENARIO_REPOSITORY, useClass: PrismaTestScenarioRepository },
     { provide: TEST_CASE_REPOSITORY, useClass: PrismaTestCaseRepository },
   ],
-  exports: [],
+  // TEST_SCENARIO_REPOSITORY/TEST_CASE_REPOSITORY exported for ba-review's
+  // RegenerateFromFeedbackCommand, which needs direct read+write access to apply a targeted
+  // changeset -- same "shared provider" precedent as AiModule exporting AGENT_REPOSITORY for
+  // prompt-management, not the QueryBus cross-boundary pattern used for peer bounded-context reads.
+  exports: [TEST_SCENARIO_REPOSITORY, TEST_CASE_REPOSITORY],
 })
 export class TestIntelligenceModule {}

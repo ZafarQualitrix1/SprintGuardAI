@@ -20,6 +20,8 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { RequirementIntelligenceModule } from './modules/requirement-intelligence/requirement-intelligence.module';
 import { TestIntelligenceModule } from './modules/test-intelligence/test-intelligence.module';
+import { BaReviewModule } from './modules/ba-review/ba-review.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { CoverageModule } from './modules/coverage/coverage.module';
@@ -75,6 +77,8 @@ import { PlatformModule } from './modules/platform/platform.module';
     SprintModule,
     RequirementIntelligenceModule,
     TestIntelligenceModule,
+    BaReviewModule,
+    NotificationsModule,
     AutomationModule,
     ExecutionModule,
     CoverageModule,
