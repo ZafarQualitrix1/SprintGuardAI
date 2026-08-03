@@ -61,6 +61,7 @@ export class UpsertAiProviderConfigDto {
   @IsOptional()
   @IsNumber()
   @Min(1)
+  @Max(32768)
   maxOutputTokens?: number;
 
   @ApiPropertyOptional()

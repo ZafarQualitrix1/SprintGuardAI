@@ -12,7 +12,11 @@ export const upsertAiProviderConfigSchema = z.object({
   temperature: z.coerce.number().min(0).max(2).optional(),
   topP: z.coerce.number().min(0).max(1).optional(),
   topK: z.coerce.number().min(1).optional(),
-  maxOutputTokens: z.coerce.number().min(1).optional(),
+  // Upper bound matches the smallest max_tokens ceiling among currently-integrated providers
+  // (Groq's llama-3.3-70b-versatile caps at 32768) -- exceeding a provider's real limit is a hard
+  // 400 from their API, not silently clamped, so this prevents saving a value guaranteed to break
+  // every call on that provider.
+  maxOutputTokens: z.coerce.number().min(1).max(32768).optional(),
   streaming: z.boolean().optional(),
   fallbackProvider: z.string().optional(),
   fallbackModel: z.string().optional(),
