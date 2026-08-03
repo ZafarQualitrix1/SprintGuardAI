@@ -73,6 +73,7 @@ export interface Sprint {
   canSync: boolean;
   lastSyncedAt: string | null;
   archivedAt: string | null;
+  jiraSiteUrl: string | null;
 }
 
 export interface SprintSyncEvent {

@@ -7,7 +7,7 @@ export function toProjectEntity(row: Project): ProjectEntity {
   return new ProjectEntity(row.id, row.organizationId, row.key, row.name, row.description);
 }
 
-export function toSprintEntity(row: Sprint): SprintEntity {
+export function toSprintEntity(row: Sprint, jiraSiteUrl: string | null = null): SprintEntity {
   return new SprintEntity(
     row.id,
     row.projectId,
@@ -21,6 +21,7 @@ export function toSprintEntity(row: Sprint): SprintEntity {
     row.sourceConnectionId,
     row.lastSyncedAt,
     row.archivedAt,
+    jiraSiteUrl,
   );
 }
 

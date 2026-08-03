@@ -191,12 +191,18 @@ export class PrismaSprintRepository implements ISprintRepository {
   async findByIdWithStories(id: string, organizationId: string): Promise<SprintWithStories | null> {
     const sprint = await this.prisma.sprint.findFirst({
       where: { id, project: { organizationId }, deletedAt: null },
-      include: { stories: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        stories: { orderBy: { createdAt: 'asc' } },
+        sourceConnection: { select: { siteUrl: true } },
+      },
     });
     if (!sprint) {
       return null;
     }
-    return new SprintWithStories(toSprintEntity(sprint), sprint.stories.map(toStoryEntity));
+    return new SprintWithStories(
+      toSprintEntity(sprint, sprint.sourceConnection?.siteUrl ?? null),
+      sprint.stories.map(toStoryEntity),
+    );
   }
 
   async listByProject(projectId: string, organizationId: string): Promise<SprintEntity[]> {
@@ -204,7 +210,7 @@ export class PrismaSprintRepository implements ISprintRepository {
       where: { projectId, project: { organizationId }, deletedAt: null, archivedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    return rows.map(toSprintEntity);
+    return rows.map((row) => toSprintEntity(row));
   }
 
   async rename(id: string, organizationId: string, name: string): Promise<SprintEntity> {

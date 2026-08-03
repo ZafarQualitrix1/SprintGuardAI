@@ -26,6 +26,9 @@ export function useGenerateRequirementAnalysis(storyId: string) {
     mutationFn: () => requirementAnalysisApi.generate(storyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: key(storyId) });
+      // Bug 3: Coverage must refresh automatically whenever Requirement Analysis changes -- it
+      // recomputes live on every GET (no cache to go stale), so invalidating just triggers a refetch.
+      queryClient.invalidateQueries({ queryKey: ['coverage', 'story', storyId] });
     },
   });
 }

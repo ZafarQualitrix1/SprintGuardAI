@@ -2,3 +2,4 @@
 export * from './project-sprints-section';
 export * from './sprint-sub-nav';
 export * from './story-picker';
+export * from './story-progress-row';

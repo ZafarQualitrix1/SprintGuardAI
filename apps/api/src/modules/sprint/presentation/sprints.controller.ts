@@ -33,6 +33,7 @@ function toSprintDto(entity: SprintEntity): SprintDto {
     canSync: entity.sourceConnectionId !== null,
     lastSyncedAt: entity.lastSyncedAt?.toISOString() ?? null,
     archivedAt: entity.archivedAt?.toISOString() ?? null,
+    jiraSiteUrl: entity.jiraSiteUrl,
   };
 }
 

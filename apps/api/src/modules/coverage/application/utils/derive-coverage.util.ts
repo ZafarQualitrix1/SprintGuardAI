@@ -81,18 +81,17 @@ export function deriveCoverage(source: Pick<SprintCoverageSource, 'requirements'
 export interface DerivedStoryCoverage extends DerivedCoverage {
   dimensions: CoverageDimensions;
   missingTestScenarios: string[];
-  missingEdgeCases: string[];
+  missingAcceptanceCriteria: string[];
   traceabilityMatrix: TraceabilityRequirement[];
 }
 
 const CATEGORY_TEST_TYPES = {
   functional: 'FUNCTIONAL',
-  api: 'API',
-  ui: 'UI',
-  security: 'SECURITY',
-  performance: 'PERFORMANCE',
-  accessibility: 'ACCESSIBILITY',
+  boundary: 'BOUNDARY',
+  negative: 'NEGATIVE',
 } as const;
+
+const RISK_PRIORITIES = new Set(['HIGH', 'CRITICAL']);
 
 function percent(numerator: number, denominator: number): number {
   return denominator === 0 ? 0 : Math.round((numerator / denominator) * 100);
@@ -107,22 +106,18 @@ function percent(numerator: number, denominator: number): number {
 export function deriveStoryCoverage(source: StoryCoverageSource): DerivedStoryCoverage {
   const { entries, gaps, summary } = deriveCoverage(source);
 
-  const missingEdgeCases: string[] = [];
   const traceabilityMatrix: TraceabilityRequirement[] = [];
 
   let acTotal = 0;
   let acCovered = 0;
+  let acRiskCovered = 0;
   const categoryCovered: Record<keyof typeof CATEGORY_TEST_TYPES, number> = {
     functional: 0,
-    api: 0,
-    ui: 0,
-    security: 0,
-    performance: 0,
-    accessibility: 0,
+    boundary: 0,
+    negative: 0,
   };
   let totalTestCases = 0;
   let automatedTestCases = 0;
-  let manualTestCases = 0;
 
   for (const requirement of source.requirements) {
     traceabilityMatrix.push({
@@ -146,19 +141,11 @@ export function deriveStoryCoverage(source: StoryCoverageSource): DerivedStoryCo
         if (typesPresent.has(testType)) categoryCovered[key] += 1;
       }
 
-      // Heuristic (not AI-derived): an AC with functional coverage but no NEGATIVE/BOUNDARY test
-      // case is flagged as missing edge-case coverage -- happy-path-only is a common, cheap-to-
-      // detect gap that doesn't need a model call to identify.
-      if (ac.testCases.length > 0 && !typesPresent.has('NEGATIVE') && !typesPresent.has('BOUNDARY')) {
-        missingEdgeCases.push(
-          `"${requirement.text}" has functional coverage but no negative/boundary edge-case tests.`,
-        );
-      }
+      if (ac.testCases.some((tc) => RISK_PRIORITIES.has(tc.priority))) acRiskCovered += 1;
 
       for (const tc of ac.testCases) {
         totalTestCases += 1;
         if (tc.automationStatus === 'AUTOMATED') automatedTestCases += 1;
-        if (tc.automationStatus === 'MANUAL') manualTestCases += 1;
       }
     }
   }
@@ -167,16 +154,14 @@ export function deriveStoryCoverage(source: StoryCoverageSource): DerivedStoryCo
     requirementCoverage: summary.coveragePercent,
     acceptanceCriteriaCoverage: percent(acCovered, acTotal),
     functionalCoverage: percent(categoryCovered.functional, acTotal),
-    apiCoverage: percent(categoryCovered.api, acTotal),
-    uiCoverage: percent(categoryCovered.ui, acTotal),
-    securityCoverage: percent(categoryCovered.security, acTotal),
-    performanceCoverage: percent(categoryCovered.performance, acTotal),
-    accessibilityCoverage: percent(categoryCovered.accessibility, acTotal),
+    boundaryCoverage: percent(categoryCovered.boundary, acTotal),
+    negativeCoverage: percent(categoryCovered.negative, acTotal),
+    riskCoverage: percent(acRiskCovered, acTotal),
     automationCoverage: percent(automatedTestCases, totalTestCases),
-    manualCoverage: percent(manualTestCases, totalTestCases),
   };
 
   const missingTestScenarios = gaps.filter((gap) => gap.gapType === 'MISSING_TEST').map((gap) => gap.description);
+  const missingAcceptanceCriteria = gaps.filter((gap) => gap.gapType === 'MISSING_AC').map((gap) => gap.description);
 
-  return { entries, gaps, summary, dimensions, missingTestScenarios, missingEdgeCases, traceabilityMatrix };
+  return { entries, gaps, summary, dimensions, missingTestScenarios, missingAcceptanceCriteria, traceabilityMatrix };
 }

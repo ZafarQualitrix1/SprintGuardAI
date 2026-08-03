@@ -50,13 +50,10 @@ export interface CoverageDimensions {
   requirementCoverage: number;
   acceptanceCriteriaCoverage: number;
   functionalCoverage: number;
-  apiCoverage: number;
-  uiCoverage: number;
-  securityCoverage: number;
-  performanceCoverage: number;
-  accessibilityCoverage: number;
+  boundaryCoverage: number;
+  negativeCoverage: number;
+  riskCoverage: number;
   automationCoverage: number;
-  manualCoverage: number;
 }
 
 export interface TraceabilityTestCase {
@@ -88,7 +85,7 @@ export interface StoryCoverageResult {
   entries: CoverageMatrixEntry[];
   gaps: Gap[];
   missingTestScenarios: string[];
-  missingEdgeCases: string[];
+  missingAcceptanceCriteria: string[];
   traceabilityMatrix: TraceabilityRequirement[];
   // Only populated on the response returned directly from POST .../coverage/compute -- same
   // never-persisted semantics as CoverageResult.aiRecommendation above.

@@ -17,6 +17,10 @@ export class SprintEntity {
     public readonly sourceConnectionId: string | null,
     public readonly lastSyncedAt: Date | null,
     public readonly archivedAt: Date | null,
+    // Jira deep links (Bug 1: "Attach the Jira link with every user story"). Null unless the
+    // caller specifically joined in the source connection's siteUrl (see
+    // ISprintRepository.findByIdWithStories) -- most read paths don't need it.
+    public readonly jiraSiteUrl: string | null = null,
   ) {}
 }
 

@@ -30,7 +30,7 @@ function toStoryDto(entity: StoryCoverageResultEntity): StoryCoverageResultDto {
     entries: entity.entries,
     gaps: entity.gaps,
     missingTestScenarios: entity.missingTestScenarios,
-    missingEdgeCases: entity.missingEdgeCases,
+    missingAcceptanceCriteria: entity.missingAcceptanceCriteria,
     traceabilityMatrix: entity.traceabilityMatrix,
     aiRecommendation: entity.aiRecommendation,
     computedAt: entity.computedAt.toISOString(),

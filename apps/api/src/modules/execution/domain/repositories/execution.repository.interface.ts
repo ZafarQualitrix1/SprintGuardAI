@@ -20,4 +20,7 @@ export interface RecordExecutionInput {
 export interface IExecutionRepository {
   record(input: RecordExecutionInput): Promise<ExecutionEntity>;
   findBySprintId(sprintId: string): Promise<ExecutionEntity[]>;
+  /** Per-story progress check (Bug 1's sprint dashboard) -- Execution has no direct storyId
+   * column, so this joins through testCase -> testScenario -> storyId. */
+  findByStoryId(storyId: string): Promise<ExecutionEntity[]>;
 }

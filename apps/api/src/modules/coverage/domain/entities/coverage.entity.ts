@@ -58,19 +58,19 @@ export class CoverageResultEntity {
 }
 
 // Category coverage isn't stored anywhere -- it's derived on every read straight from
-// TestCase.testType/automationStatus (see deriveStoryCoverage), which is why the story-scoped GET
-// query has no persistence step at all (see get-story-coverage.query.ts).
+// TestCase.testType/automationStatus/priority (see deriveStoryCoverage), which is why the
+// story-scoped GET query has no persistence step at all (see get-story-coverage.query.ts).
 export interface CoverageDimensions {
   requirementCoverage: number;
   acceptanceCriteriaCoverage: number;
   functionalCoverage: number;
-  apiCoverage: number;
-  uiCoverage: number;
-  securityCoverage: number;
-  performanceCoverage: number;
-  accessibilityCoverage: number;
+  boundaryCoverage: number;
+  negativeCoverage: number;
+  // Heuristic, not AI-derived: % of acceptance criteria whose attached test case(s) include at
+  // least one HIGH/CRITICAL priority case -- "is the risky behavior here actually tested by
+  // something we treat as important," not a formal risk-assessment score.
+  riskCoverage: number;
   automationCoverage: number;
-  manualCoverage: number;
 }
 
 export interface TraceabilityTestCase {
@@ -103,7 +103,7 @@ export class StoryCoverageResultEntity {
     public readonly entries: CoverageMatrixEntryEntity[],
     public readonly gaps: GapEntity[],
     public readonly missingTestScenarios: string[],
-    public readonly missingEdgeCases: string[],
+    public readonly missingAcceptanceCriteria: string[],
     public readonly traceabilityMatrix: TraceabilityRequirement[],
     // Same "compute-only, never persisted" semantics as CoverageResultEntity.aiRecommendation.
     public readonly aiRecommendation: CoverageRecommendation | null,

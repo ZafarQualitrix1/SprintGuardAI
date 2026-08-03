@@ -13,6 +13,7 @@ export class SprintDto {
   @ApiProperty() canSync!: boolean;
   @ApiPropertyOptional({ nullable: true }) lastSyncedAt!: string | null;
   @ApiPropertyOptional({ nullable: true }) archivedAt!: string | null;
+  @ApiPropertyOptional({ nullable: true }) jiraSiteUrl!: string | null;
 }
 
 export class StoryDto {

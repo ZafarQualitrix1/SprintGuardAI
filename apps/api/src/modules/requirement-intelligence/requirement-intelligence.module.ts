@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
 import { RequirementIntelligenceController } from './presentation/requirement-intelligence.controller';
 import { RequirementAnalysisReportController } from './presentation/requirement-analysis-report.controller';
+import { JiraStoryDetailController } from './presentation/jira-story-detail.controller';
 
 import { REQUIREMENT_INTELLIGENCE_COMMAND_HANDLERS } from './application/commands';
 import { REQUIREMENT_INTELLIGENCE_QUERY_HANDLERS } from './application/queries';
@@ -20,7 +21,7 @@ import { PrismaRequirementAnalysisReportRepository } from './infrastructure/repo
 // global QueryBus instead, same cross-module boundary the `sprint` module already uses.
 @Module({
   imports: [AiModule],
-  controllers: [RequirementIntelligenceController, RequirementAnalysisReportController],
+  controllers: [RequirementIntelligenceController, RequirementAnalysisReportController, JiraStoryDetailController],
   providers: [
     ...REQUIREMENT_INTELLIGENCE_COMMAND_HANDLERS,
     ...REQUIREMENT_INTELLIGENCE_QUERY_HANDLERS,

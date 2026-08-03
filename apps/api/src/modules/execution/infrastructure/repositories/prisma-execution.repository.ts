@@ -40,4 +40,13 @@ export class PrismaExecutionRepository implements IExecutionRepository {
     });
     return rows.map(toExecutionEntity);
   }
+
+  async findByStoryId(storyId: string) {
+    const rows = await this.prisma.execution.findMany({
+      where: { testCase: { testScenario: { storyId } } },
+      include: { testCase: true },
+      orderBy: { executedAt: 'desc' },
+    });
+    return rows.map(toExecutionEntity);
+  }
 }

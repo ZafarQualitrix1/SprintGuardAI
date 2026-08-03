@@ -51,13 +51,10 @@ export class CoverageDimensionsDto {
   @ApiProperty() requirementCoverage!: number;
   @ApiProperty() acceptanceCriteriaCoverage!: number;
   @ApiProperty() functionalCoverage!: number;
-  @ApiProperty() apiCoverage!: number;
-  @ApiProperty() uiCoverage!: number;
-  @ApiProperty() securityCoverage!: number;
-  @ApiProperty() performanceCoverage!: number;
-  @ApiProperty() accessibilityCoverage!: number;
+  @ApiProperty() boundaryCoverage!: number;
+  @ApiProperty() negativeCoverage!: number;
+  @ApiProperty() riskCoverage!: number;
   @ApiProperty() automationCoverage!: number;
-  @ApiProperty() manualCoverage!: number;
 }
 
 export class TraceabilityTestCaseDto {
@@ -89,7 +86,7 @@ export class StoryCoverageResultDto {
   @ApiProperty({ type: [CoverageMatrixEntryDto] }) entries!: CoverageMatrixEntryDto[];
   @ApiProperty({ type: [GapDto] }) gaps!: GapDto[];
   @ApiProperty({ type: [String] }) missingTestScenarios!: string[];
-  @ApiProperty({ type: [String] }) missingEdgeCases!: string[];
+  @ApiProperty({ type: [String] }) missingAcceptanceCriteria!: string[];
   @ApiProperty({ type: [TraceabilityRequirementDto] }) traceabilityMatrix!: TraceabilityRequirementDto[];
   @ApiPropertyOptional({ type: CoverageRecommendationDto, nullable: true })
   aiRecommendation!: CoverageRecommendationDto | null;

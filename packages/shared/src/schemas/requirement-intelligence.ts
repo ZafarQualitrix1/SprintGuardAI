@@ -128,3 +128,49 @@ export interface RequirementAnalysisReport {
   confidenceScore: number | null;
   createdAt: string;
 }
+
+// Bug 4's "View Full Story" drawer -- every Jira field available for a story.
+export interface JiraComment {
+  id: string;
+  author: string | null;
+  body: string;
+  createdAt: string | null;
+}
+
+export interface JiraAttachment {
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  url: string | null;
+}
+
+export interface JiraLink {
+  type: string;
+  externalId: string;
+}
+
+export interface JiraStoryDetail {
+  externalId: string;
+  title: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  status: string;
+  priority: string | null;
+  assignee: string | null;
+  reporter: string | null;
+  labels: string[];
+  components: string[];
+  epic: string | null;
+  epicKey: string | null;
+  parent: string | null;
+  storyPoints: number | null;
+  dueDate: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  environment: string | null;
+  comments: JiraComment[];
+  attachments: JiraAttachment[];
+  links: JiraLink[];
+  issueType: string;
+  additionalCustomFields: Record<string, unknown>;
+}

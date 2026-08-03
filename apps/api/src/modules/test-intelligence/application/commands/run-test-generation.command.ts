@@ -18,6 +18,7 @@ import {
 } from '../../domain/repositories/test-case.repository.interface';
 import { TestScenarioEntity } from '../../domain/entities/test-artifact.entity';
 import { testCaseOutputSchema, testScenarioOutputSchema } from '../schemas/test-generation.schema';
+import { RunRequirementIntelligenceAgentCommand } from '../../../requirement-intelligence/application/commands/run-requirement-intelligence-agent.command';
 
 export class RunTestGenerationCommand {
   constructor(
@@ -51,13 +52,32 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
       );
     }
 
-    const acceptanceCriteria = await this.acceptanceCriterionReadRepository.findByStoryId(
+    let acceptanceCriteria = await this.acceptanceCriterionReadRepository.findByStoryId(
       command.storyId,
       command.organizationId,
     );
+
+    // Bug 4: never fail outright just because Acceptance Criteria haven't been extracted yet --
+    // priority sequence is AC -> Description -> Business Rules -> AI Requirement Analysis. Running
+    // the Requirement Intelligence agent (which reads the story's description and infers
+    // requirements/AC, business rules included) covers all three fallback sources in one call,
+    // since that's the exact same pipeline "Analyze story" already uses.
+    if (acceptanceCriteria.length === 0) {
+      this.logger.log(
+        `No acceptance criteria for story ${command.storyId} -- inferring from description via Requirement Intelligence before generating tests.`,
+      );
+      await this.commandBus.execute(
+        new RunRequirementIntelligenceAgentCommand(command.organizationId, command.storyId),
+      );
+      acceptanceCriteria = await this.acceptanceCriterionReadRepository.findByStoryId(
+        command.storyId,
+        command.organizationId,
+      );
+    }
+
     if (acceptanceCriteria.length === 0) {
       throw new BadRequestException(
-        'No acceptance criteria found for this story. Run Requirement Intelligence first.',
+        'Could not derive acceptance criteria for this story, even from its description. Add a description or acceptance criteria in Jira and try again.',
       );
     }
 

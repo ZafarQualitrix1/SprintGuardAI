@@ -11,8 +11,8 @@ interface SprintSubNavProps {
 const TABS = [
   { label: 'Analysis', suffix: '' },
   { label: 'Requirements', suffix: 'requirements' },
-  { label: 'Coverage', suffix: 'coverage' },
   { label: 'Test Generator', suffix: 'test-generator' },
+  { label: 'Coverage', suffix: 'coverage' },
   { label: 'Automation', suffix: 'automation' },
   { label: 'Manual Execution', suffix: 'executions' },
   { label: 'Automation Execution', suffix: 'automation-execution' },

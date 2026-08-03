@@ -12,8 +12,7 @@ import {
   useRequirementAnalysisHistory,
 } from '@/features/requirement-intelligence/api';
 import { CollapsibleSection, StringList } from './collapsible-section';
-import { TestCaseTable } from './test-case-table';
-import { exportAnalysisReportToJson, exportTestCasesToCsv } from '../lib/export-json-csv';
+import { exportAnalysisReportToJson } from '../lib/export-json-csv';
 import { exportAnalysisReportToPdf } from '../lib/export-pdf';
 import { exportAnalysisReportToExcel } from '../lib/export-excel';
 
@@ -40,7 +39,7 @@ export function StoryAnalysisReport({ storyId, storyTitle, report: latest }: Sto
     return history.find((r) => r.version === selectedVersion) ?? latest;
   }, [selectedVersion, history, latest]);
 
-  const { analysis, testCases, coverage } = report;
+  const { analysis, coverage } = report;
 
   const onRegenerate = () =>
     generate.mutate(undefined, {
@@ -88,9 +87,6 @@ export function StoryAnalysisReport({ storyId, storyTitle, report: latest }: Sto
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportAnalysisReportToJson(report)}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> JSON
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => exportTestCasesToCsv(report)}>
-            <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportAnalysisReportToPdf(storyTitle, report)}>
             <FileText className="mr-1.5 h-3.5 w-3.5" /> PDF
@@ -257,9 +253,6 @@ export function StoryAnalysisReport({ storyId, storyTitle, report: latest }: Sto
           )}
         </CollapsibleSection>
 
-        <CollapsibleSection title="Test Cases" count={testCases.length} defaultOpen>
-          <TestCaseTable testCases={testCases} />
-        </CollapsibleSection>
       </div>
 
       <div className="flex items-center justify-between border-t pt-2 text-xs text-muted-foreground">

@@ -12,6 +12,15 @@ export function useExecutions(sprintId: string) {
   });
 }
 
+// Per-story progress check (Bug 1's sprint dashboard "has this story been executed yet?").
+export function useExecutionsByStory(storyId: string | null) {
+  return useQuery({
+    queryKey: ['execution', 'story', storyId],
+    queryFn: () => executionApi.listByStory(storyId as string),
+    enabled: Boolean(storyId),
+  });
+}
+
 export function useRecordExecution(sprintId: string) {
   const queryClient = useQueryClient();
   return useMutation({

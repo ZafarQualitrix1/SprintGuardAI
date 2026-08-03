@@ -1,4 +1,5 @@
 export * from './lock-badge';
+export * from './ba-review-status-badge';
 export * from './ba-review-status-panel';
 export * from './review-timeline';
 export * from './admin-unlock-dialog';

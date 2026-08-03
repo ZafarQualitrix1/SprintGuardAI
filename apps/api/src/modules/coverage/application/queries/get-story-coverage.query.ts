@@ -33,7 +33,7 @@ export class GetStoryCoverageHandler implements IQueryHandler<GetStoryCoverageQu
       throw new NotFoundException('Story not found');
     }
 
-    const { entries, gaps, summary, dimensions, missingTestScenarios, missingEdgeCases, traceabilityMatrix } =
+    const { entries, gaps, summary, dimensions, missingTestScenarios, missingAcceptanceCriteria, traceabilityMatrix } =
       deriveStoryCoverage(source);
 
     return new StoryCoverageResultEntity(
@@ -57,7 +57,7 @@ export class GetStoryCoverageHandler implements IQueryHandler<GetStoryCoverageQu
         description: gap.description,
       })),
       missingTestScenarios,
-      missingEdgeCases,
+      missingAcceptanceCriteria,
       traceabilityMatrix,
       null,
       new Date(),

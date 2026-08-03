@@ -28,6 +28,7 @@ export interface TestCaseCoverageSource {
   title: string;
   testType: string;
   automationStatus: string;
+  priority: string;
 }
 
 export interface AcceptanceCriterionStoryCoverageSource extends AcceptanceCriterionCoverageSource {

@@ -33,7 +33,7 @@ export class ComputeStoryCoverageHandler
       throw new NotFoundException('Story not found');
     }
 
-    const { entries, gaps, summary, dimensions, missingTestScenarios, missingEdgeCases, traceabilityMatrix } =
+    const { entries, gaps, summary, dimensions, missingTestScenarios, missingAcceptanceCriteria, traceabilityMatrix } =
       deriveStoryCoverage(source);
 
     // Persisted so Release Readiness's sprint-wide aggregate (which reads CoverageMatrixEntry by
@@ -97,7 +97,7 @@ export class ComputeStoryCoverageHandler
         description: gap.description,
       })),
       missingTestScenarios,
-      missingEdgeCases,
+      missingAcceptanceCriteria,
       traceabilityMatrix,
       aiRecommendation,
       new Date(),

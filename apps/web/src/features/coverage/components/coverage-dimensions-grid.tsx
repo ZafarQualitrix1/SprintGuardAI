@@ -7,13 +7,10 @@ const DIMENSIONS: { key: keyof CoverageDimensions; label: string }[] = [
   { key: 'requirementCoverage', label: 'Requirement Coverage' },
   { key: 'acceptanceCriteriaCoverage', label: 'Acceptance Criteria Coverage' },
   { key: 'functionalCoverage', label: 'Functional Coverage' },
-  { key: 'apiCoverage', label: 'API Coverage' },
-  { key: 'uiCoverage', label: 'UI Coverage' },
-  { key: 'securityCoverage', label: 'Security Coverage' },
-  { key: 'performanceCoverage', label: 'Performance Coverage' },
-  { key: 'accessibilityCoverage', label: 'Accessibility Coverage' },
+  { key: 'boundaryCoverage', label: 'Boundary Coverage' },
+  { key: 'negativeCoverage', label: 'Negative Coverage' },
+  { key: 'riskCoverage', label: 'Risk Coverage' },
   { key: 'automationCoverage', label: 'Automation Coverage' },
-  { key: 'manualCoverage', label: 'Manual Coverage' },
 ];
 
 export function CoverageDimensionsGrid({ dimensions }: { dimensions: CoverageDimensions }) {

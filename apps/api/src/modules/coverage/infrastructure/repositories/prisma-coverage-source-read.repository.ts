@@ -88,7 +88,7 @@ export class PrismaCoverageSourceReadRepository implements ICoverageSourceReadRe
           include: {
             testScenarios: {
               include: {
-                testCases: { select: { id: true, title: true, testType: true, automationStatus: true } },
+                testCases: { select: { id: true, title: true, testType: true, automationStatus: true, priority: true } },
               },
             },
           },

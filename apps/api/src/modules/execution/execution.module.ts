@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ExecutionController } from './presentation/execution.controller';
 import { TestCaseExecutionsController } from './presentation/test-case-executions.controller';
 import { SprintExecutionsController } from './presentation/sprint-executions.controller';
+import { StoryExecutionsController } from './presentation/story-executions.controller';
 
 import { EXECUTION_COMMAND_HANDLERS } from './application/commands';
 import { EXECUTION_QUERY_HANDLERS } from './application/queries';
@@ -14,7 +15,7 @@ import { PrismaExecutionRepository } from './infrastructure/repositories/prisma-
 // Bounded context module: Execution (Solution Architecture §6). MVP scope: manual test result
 // capture only -- CI/CD ingestion is a future phase.
 @Module({
-  controllers: [ExecutionController, TestCaseExecutionsController, SprintExecutionsController],
+  controllers: [ExecutionController, TestCaseExecutionsController, SprintExecutionsController, StoryExecutionsController],
   providers: [
     ...EXECUTION_COMMAND_HANDLERS,
     ...EXECUTION_QUERY_HANDLERS,

@@ -1,7 +1,6 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { AlertCircle, ListChecks } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { EmptyState } from '@/components/layout/empty-state';
@@ -10,21 +9,18 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSprint } from '@/features/sprint/api';
+import { StoryProgressRow } from '@/features/sprint/components';
 import { ApiError } from '@/lib/api-client';
-
-const relatedPages = [
-  { label: 'Requirement Intelligence', suffix: 'requirements' },
-  { label: 'Coverage', suffix: 'coverage' },
-  { label: 'AI Test Generator', suffix: 'test-generator' },
-  { label: 'Executions', suffix: 'executions' },
-  { label: 'Release Readiness', suffix: 'release-readiness' },
-] as const;
 
 function formatDate(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// Bug 1: the sprint dashboard is now the single entry point into the user-story-driven workflow --
+// select ONE story here (row click or a stage badge) and every downstream module (Requirement
+// Intelligence, Test Generator, Coverage, Manual Execution, Release Readiness) operates on just
+// that story from then on, instead of rendering every story in the sprint at once.
 export default function SprintAnalysisPage() {
   const params = useParams<{ sprintId: string }>();
   const { data: sprint, isLoading, isError, error } = useSprint(params.sprintId);
@@ -57,7 +53,7 @@ export default function SprintAnalysisPage() {
     <div>
       <PageHeader
         title={sprint.name}
-        description={sprint.goal ?? 'AI-analyzed stories, risks, and dependencies for this sprint.'}
+        description={sprint.goal ?? 'Select a user story below to start its AI-driven QA workflow.'}
         actions={<Badge variant={sprint.status === 'ACTIVE' ? 'success' : 'secondary'}>{sprint.status}</Badge>}
       />
 
@@ -66,18 +62,6 @@ export default function SprintAnalysisPage() {
         <span>End: {formatDate(sprint.endDate)}</span>
         <span>Source: {sprint.source}</span>
         <span>{sprint.stories.length} stories</span>
-      </div>
-
-      <div className="mb-4 flex flex-wrap gap-2">
-        {relatedPages.map((page) => (
-          <Link
-            key={page.suffix}
-            href={`/dashboard/sprints/${sprint.id}/${page.suffix}` as never}
-            className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          >
-            {page.label}
-          </Link>
-        ))}
       </div>
 
       <Card>
@@ -97,25 +81,13 @@ export default function SprintAnalysisPage() {
                     <th className="py-2 pr-4 font-medium">Status</th>
                     <th className="py-2 pr-4 font-medium">Points</th>
                     <th className="py-2 pr-4 font-medium">Priority</th>
-                    <th className="py-2 font-medium">Assignee</th>
+                    <th className="py-2 pr-4 font-medium">Assignee</th>
+                    <th className="py-2 font-medium">Progress</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {sprint.stories.map((story) => (
-                    <tr key={story.id}>
-                      <td className="py-2 pr-4">
-                        <div className="font-medium">{story.title}</div>
-                        {story.externalId ? (
-                          <div className="font-mono text-xs text-muted-foreground">{story.externalId}</div>
-                        ) : null}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Badge variant="secondary">{story.status}</Badge>
-                      </td>
-                      <td className="py-2 pr-4">{story.storyPoints ?? '—'}</td>
-                      <td className="py-2 pr-4">{story.priority ?? '—'}</td>
-                      <td className="py-2">{story.assignee ?? 'Unassigned'}</td>
-                    </tr>
+                    <StoryProgressRow key={story.id} sprintId={sprint.id} story={story} jiraSiteUrl={sprint.jiraSiteUrl} />
                   ))}
                 </tbody>
               </table>

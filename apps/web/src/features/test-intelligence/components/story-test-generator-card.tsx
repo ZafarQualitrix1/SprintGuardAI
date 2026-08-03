@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Wand2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/empty-state';
 import { useGenerateTests, useTestScenarios } from '@/features/test-intelligence/api';
 import { useBaReviewStatus } from '@/features/ba-review/api';
+import { BaReviewStatusBadge } from '@/features/ba-review/components';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 import type { Story } from '@sprintguard/shared';
@@ -22,15 +22,27 @@ const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'des
 
 interface StoryTestGeneratorCardProps {
   story: Pick<Story, 'id' | 'title'>;
-  /** Only passed from the sprint-list pages -- renders a "View full story" link; the detail page itself omits this. */
-  sprintId?: string;
 }
 
-export function StoryTestGeneratorCard({ story, sprintId }: StoryTestGeneratorCardProps) {
+export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
   const { data: scenarios, isLoading } = useTestScenarios(story.id);
   const generate = useGenerateTests(story.id);
   const { data: baStatus } = useBaReviewStatus(story.id);
+  // Bug 4: disabled only while a review is actually in flight at the BA in Jira -- see
+  // story-requirements-card.tsx for the identical rationale.
+  const reviewInFlight = Boolean(
+    baStatus &&
+      (baStatus.status === 'AWAITING_APPROVAL' ||
+        baStatus.status === 'FEEDBACK_RECEIVED' ||
+        baStatus.status === 'REGENERATION_IN_PROGRESS'),
+  );
   const isLocked = baStatus?.isLocked ?? false;
+  const disabled = generate.isPending || isLocked || reviewInFlight;
+  const disabledReason = isLocked
+    ? 'Test cases for this story are BA-approved and locked. An Admin must unlock it first.'
+    : reviewInFlight
+      ? 'A BA review is in progress for this story. Generate is disabled until it is approved.'
+      : undefined;
 
   const onGenerate = () =>
     generate.mutate(undefined, {
@@ -48,18 +60,9 @@ export function StoryTestGeneratorCard({ story, sprintId }: StoryTestGeneratorCa
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           <CardTitle className="text-base">{story.title}</CardTitle>
-          {sprintId ? (
-            <Link href={`/dashboard/sprints/${sprintId}/stories/${story.id}`} className="text-xs text-primary hover:underline">
-              View full story →
-            </Link>
-          ) : null}
+          {baStatus ? <BaReviewStatusBadge status={baStatus.status} reviewCycleCount={baStatus.reviewCycleCount} /> : null}
         </div>
-        <Button
-          size="sm"
-          onClick={onGenerate}
-          disabled={generate.isPending || isLocked}
-          title={isLocked ? 'Test cases for this story are BA-approved and locked. An Admin must unlock it first.' : undefined}
-        >
+        <Button size="sm" onClick={onGenerate} disabled={disabled} title={disabledReason}>
           <Wand2 className="mr-2 h-4 w-4" />
           {generate.isPending ? 'Generating…' : scenarios?.length ? 'Regenerate tests' : 'Generate tests'}
         </Button>
