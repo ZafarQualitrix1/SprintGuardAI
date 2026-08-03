@@ -7,4 +7,9 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(2)
   fullName?: string;
+
+  @ApiPropertyOptional({ example: 'clx1y2z3a0001abcd1234efgh', description: 'Role.id to assign this user' })
+  @IsOptional()
+  @IsString()
+  roleId?: string;
 }

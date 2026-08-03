@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const updateUserSchema = z.object({
   fullName: z.string().min(2).optional(),
+  roleId: z.string().min(1).optional(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 

@@ -26,6 +26,7 @@ import {
   useResetUserPassword,
   useSuspendUser,
 } from '@/features/admin/api';
+import { ChangeRoleDialog } from './change-role-dialog';
 
 export function UsersPanel() {
   const [search, setSearch] = useState('');
@@ -36,6 +37,7 @@ export function UsersPanel() {
   const forceLogout = useForceLogoutUser();
   const deleteUser = useDeleteUser();
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const [roleTarget, setRoleTarget] = useState<AdminUserSummary | null>(null);
 
   const onError = (title: string) => (error: unknown) =>
     toast({ variant: 'destructive', title, description: error instanceof ApiError ? error.message : 'Something went wrong.' });
@@ -56,6 +58,9 @@ export function UsersPanel() {
       header: '',
       render: (u) =>
         u.id === currentUserId ? null : (
+          // Row click opens the Change Role dialog -- stop propagation here so opening this menu,
+          // or acting on any item inside it, doesn't also trigger that.
+          <div onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="User actions">
@@ -63,6 +68,8 @@ export function UsersPanel() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setRoleTarget(u)}>Change role</DropdownMenuItem>
+              <DropdownMenuSeparator />
               {u.isActive ? (
                 <DropdownMenuItem onSelect={() => suspend.mutate(u.id, { onError: onError('Could not suspend user') })}>
                   Suspend
@@ -109,6 +116,7 @@ export function UsersPanel() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         ),
     },
   ];
@@ -126,8 +134,12 @@ export function UsersPanel() {
           rowKey={(u) => u.id}
           isLoading={isLoading}
           emptyDescription="No users found for these filters."
+          onRowClick={(u) => {
+            if (u.id !== currentUserId) setRoleTarget(u);
+          }}
         />
       </CardContent>
+      <ChangeRoleDialog user={roleTarget} open={roleTarget !== null} onOpenChange={(open) => !open && setRoleTarget(null)} />
     </Card>
   );
 }

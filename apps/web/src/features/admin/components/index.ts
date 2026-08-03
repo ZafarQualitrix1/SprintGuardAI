@@ -1,6 +1,7 @@
 // Feature-specific React components for 'admin', composed from components/ui primitives.
 export * from './dashboard-overview';
 export * from './users-panel';
+export * from './change-role-dialog';
 export * from './roles-permissions-panel';
 export * from './system-monitoring-panel';
 export * from './audit-logs-panel';

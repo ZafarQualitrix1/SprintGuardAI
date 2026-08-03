@@ -1,10 +1,11 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { PrismaService } from '@sprintguard/database';
 import { IamAuditLogService } from '../../infrastructure/services/iam-audit-log.service';
 
 export interface UpdateUserInput {
   fullName?: string;
+  roleId?: string;
 }
 
 export class UpdateUserCommand {
@@ -24,11 +25,23 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand, { i
   ) {}
 
   async execute(command: UpdateUserCommand): Promise<{ id: string; fullName: string }> {
+    if (command.input.roleId && command.targetUserId === command.actorId) {
+      throw new BadRequestException('You cannot change your own role.');
+    }
+
     const membership = await this.prisma.membership.findUnique({
       where: { organizationId_userId: { organizationId: command.organizationId, userId: command.targetUserId } },
     });
     if (!membership) {
       throw new NotFoundException('User not found in this organization');
+    }
+
+    if (command.input.roleId) {
+      const role = await this.prisma.role.findUnique({ where: { id: command.input.roleId } });
+      if (!role) {
+        throw new NotFoundException('Role not found');
+      }
+      await this.prisma.membership.update({ where: { id: membership.id }, data: { roleId: role.id } });
     }
 
     const user = await this.prisma.user.update({
