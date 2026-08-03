@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreVertical } from 'lucide-react';
+import { ToastAction } from '@/components/ui/toast';
 import { toast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
@@ -86,6 +87,17 @@ export function UsersPanel() {
                       toast({
                         title: 'Temporary password generated',
                         description: `${result.temporaryPassword} -- share this with the user; it will not be shown again.`,
+                        action: (
+                          <ToastAction
+                            altText="Copy password"
+                            onClick={() => {
+                              navigator.clipboard.writeText(result.temporaryPassword);
+                              toast({ title: 'Copied to clipboard' });
+                            }}
+                          >
+                            Copy
+                          </ToastAction>
+                        ),
                       }),
                     onError: onError('Could not reset password'),
                   })
