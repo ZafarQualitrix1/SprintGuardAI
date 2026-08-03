@@ -7,10 +7,10 @@ import { EmptyState } from '@/components/layout/empty-state';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProjectSprintsSection } from '@/features/sprint/components';
-import { useProjects } from '@/features/sprint/api';
+import { useProjectsWithSprints } from '@/features/sprint/api';
 
 export default function SprintDashboardPage() {
-  const { data: projects, isLoading } = useProjects();
+  const { data: projects, isLoading } = useProjectsWithSprints();
 
   return (
     <div>
@@ -46,7 +46,7 @@ export default function SprintDashboardPage() {
       ) : (
         <div className="space-y-4">
           {projects.map((project) => (
-            <ProjectSprintsSection key={project.id} project={project} />
+            <ProjectSprintsSection key={project.id} project={project} sprints={project.sprints} />
           ))}
         </div>
       )}

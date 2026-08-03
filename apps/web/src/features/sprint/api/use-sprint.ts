@@ -7,6 +7,12 @@ export function useProjects() {
   return useQuery({ queryKey: ['sprint', 'projects'], queryFn: projectsApi.list });
 }
 
+// Backs the Sprint Dashboard page: one request for every project + its sprints together, instead
+// of useProjects() plus one useSprints(project.id) per project card.
+export function useProjectsWithSprints() {
+  return useQuery({ queryKey: ['sprint', 'projects-with-sprints'], queryFn: projectsApi.listWithSprints });
+}
+
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -37,6 +43,7 @@ export function useImportJiraSprint() {
     mutationFn: sprintsApi.importFromJira,
     onSuccess: (sprint) => {
       queryClient.invalidateQueries({ queryKey: ['sprint', 'list', sprint.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['sprint', 'projects-with-sprints'] });
     },
   });
 }
@@ -44,6 +51,7 @@ export function useImportJiraSprint() {
 function invalidateSprint(queryClient: ReturnType<typeof useQueryClient>, projectId: string, sprintId: string) {
   queryClient.invalidateQueries({ queryKey: ['sprint', 'list', projectId] });
   queryClient.invalidateQueries({ queryKey: ['sprint', 'detail', sprintId] });
+  queryClient.invalidateQueries({ queryKey: ['sprint', 'projects-with-sprints'] });
 }
 
 export function useSyncSprint(projectId: string) {
@@ -83,7 +91,10 @@ export function useDeleteSprint(projectId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sprintId: string) => sprintsApi.remove(sprintId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sprint', 'list', projectId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sprint', 'list', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['sprint', 'projects-with-sprints'] });
+    },
   });
 }
 

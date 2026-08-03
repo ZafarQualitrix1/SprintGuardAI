@@ -19,7 +19,7 @@ import { ImportJiraSprintDto } from './dto/import-jira-sprint.dto';
 import { RenameSprintDto } from './dto/rename-sprint.dto';
 import { ArchiveSprintDto } from './dto/archive-sprint.dto';
 
-function toSprintDto(entity: SprintEntity): SprintDto {
+export function toSprintDto(entity: SprintEntity): SprintDto {
   return {
     id: entity.id,
     projectId: entity.projectId,

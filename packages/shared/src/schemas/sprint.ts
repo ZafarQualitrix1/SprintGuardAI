@@ -60,6 +60,10 @@ export interface Project {
   description: string | null;
 }
 
+export interface ProjectWithSprints extends Project {
+  sprints: Sprint[];
+}
+
 export interface Sprint {
   id: string;
   projectId: string;

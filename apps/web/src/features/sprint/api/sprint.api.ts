@@ -2,6 +2,7 @@ import type {
   CreateProjectInput,
   ImportJiraSprintInput,
   Project,
+  ProjectWithSprints,
   Sprint,
   SprintDetail,
   SprintSyncEvent,
@@ -10,6 +11,7 @@ import { apiClient } from '@/lib/api-client';
 
 export const projectsApi = {
   list: () => apiClient.get<Project[]>('/projects'),
+  listWithSprints: () => apiClient.get<ProjectWithSprints[]>('/projects/with-sprints'),
   create: (input: CreateProjectInput) => apiClient.post<Project>('/projects', input),
 };
 

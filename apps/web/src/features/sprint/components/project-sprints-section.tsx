@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/empty-state';
 import { useSprints } from '@/features/sprint/api';
 import { SprintActionsMenu } from './sprint-actions-menu';
-import type { Project } from '@sprintguard/shared';
+import type { Project, Sprint } from '@sprintguard/shared';
 
 function lastSyncedLabel(iso: string | null): string | null {
   if (!iso) return null;
@@ -27,8 +27,18 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'success' | 'warni
   CANCELLED: 'warning',
 };
 
-export function ProjectSprintsSection({ project }: { project: Project }) {
-  const { data: sprints, isLoading } = useSprints(project.id);
+interface ProjectSprintsSectionProps {
+  project: Project;
+  // Pre-fetched by the Sprint Dashboard page (one combined request for all projects) -- when
+  // provided, this component renders straight from it instead of firing its own useSprints query.
+  sprints?: Sprint[];
+}
+
+export function ProjectSprintsSection({ project, sprints: providedSprints }: ProjectSprintsSectionProps) {
+  const shouldFetch = providedSprints === undefined;
+  const { data: fetchedSprints, isLoading: isFetchLoading } = useSprints(shouldFetch ? project.id : undefined);
+  const sprints = providedSprints ?? fetchedSprints;
+  const isLoading = shouldFetch && isFetchLoading;
 
   return (
     <Card>

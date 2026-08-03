@@ -3,8 +3,9 @@ import { PrismaService } from '@sprintguard/database';
 import {
   CreateProjectInput,
   IProjectRepository,
+  ProjectWithSprints,
 } from '../../domain/repositories/project.repository.interface';
-import { toProjectEntity } from '../mappers';
+import { toProjectEntity, toSprintEntity } from '../mappers';
 
 @Injectable()
 export class PrismaProjectRepository implements IProjectRepository {
@@ -38,5 +39,22 @@ export class PrismaProjectRepository implements IProjectRepository {
       orderBy: { createdAt: 'desc' },
     });
     return rows.map(toProjectEntity);
+  }
+
+  async listByOrganizationWithSprints(organizationId: string): Promise<ProjectWithSprints[]> {
+    const rows = await this.prisma.project.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sprints: {
+          where: { deletedAt: null, archivedAt: null },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+    return rows.map((row) => ({
+      project: toProjectEntity(row),
+      sprints: row.sprints.map((sprint) => toSprintEntity(sprint)),
+    }));
   }
 }
