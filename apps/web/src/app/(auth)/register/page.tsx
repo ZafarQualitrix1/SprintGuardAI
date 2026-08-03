@@ -41,13 +41,19 @@ export default function RegisterPage() {
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} autoComplete="off">
-        <AppInput
-          label="Organization name"
-          placeholder="Acme Corp"
-          autoComplete="off"
-          error={errors.organizationName?.message}
-          {...register('organizationName')}
-        />
+        <div className="space-y-1">
+          <AppInput
+            label="Organization name"
+            placeholder="Acme Corp"
+            autoComplete="off"
+            error={errors.organizationName?.message}
+            {...register('organizationName')}
+          />
+          <p className="text-xs text-[var(--color-text-secondary)]">
+            If this matches an existing organization, you&apos;ll join it as a QA Engineer instead of
+            creating a new one.
+          </p>
+        </div>
         <AppInput
           label="Full name"
           placeholder="Jane Doe"

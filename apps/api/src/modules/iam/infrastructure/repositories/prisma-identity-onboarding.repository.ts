@@ -25,8 +25,11 @@ export class PrismaIdentityOnboardingRepository implements IIdentityOnboardingRe
   async registerOrganizationOwner(
     input: OnboardOrganizationInput,
   ): Promise<OnboardOrganizationResult> {
-    const ownerRole = await this.prisma.role.findUnique({ where: { key: 'OWNER' } });
-    if (!ownerRole) {
+    const [ownerRole, memberRole] = await Promise.all([
+      this.prisma.role.findUnique({ where: { key: 'OWNER' } }),
+      this.prisma.role.findUnique({ where: { key: 'QA_ENGINEER' } }),
+    ]);
+    if (!ownerRole || !memberRole) {
       // The RBAC catalog (packages/database/prisma/seed.ts) has not been seeded yet -- this is an
       // environment setup error, not a user-facing one.
       throw new InternalServerErrorException(
@@ -35,9 +38,18 @@ export class PrismaIdentityOnboardingRepository implements IIdentityOnboardingRe
     }
 
     const { user, organization } = await this.prisma.$transaction(async (tx) => {
-      const organization = await tx.organization.create({
-        data: { name: input.organizationName, slug: slugify(input.organizationName) },
+      // Case-insensitive match on the typed org name -- if someone at the same company already
+      // registered "Qualitrix", the next teammate joins that tenant instead of creating their own
+      // "Qualitrix" with themselves as its only member.
+      const existingOrganization = await tx.organization.findFirst({
+        where: { name: { equals: input.organizationName.trim(), mode: 'insensitive' }, deletedAt: null },
       });
+
+      const organization =
+        existingOrganization ??
+        (await tx.organization.create({
+          data: { name: input.organizationName, slug: slugify(input.organizationName) },
+        }));
 
       const user = await tx.user.create({
         data: {
@@ -48,7 +60,11 @@ export class PrismaIdentityOnboardingRepository implements IIdentityOnboardingRe
       });
 
       await tx.membership.create({
-        data: { organizationId: organization.id, userId: user.id, roleId: ownerRole.id },
+        data: {
+          organizationId: organization.id,
+          userId: user.id,
+          roleId: existingOrganization ? memberRole.id : ownerRole.id,
+        },
       });
 
       return { user, organization };
