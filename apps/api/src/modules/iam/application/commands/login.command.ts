@@ -32,6 +32,16 @@ export class LoginHandler implements ICommandHandler<LoginCommand, AuthSessionRe
   async execute(command: LoginCommand): Promise<AuthSessionResult> {
     const result = await this.userRepository.findByEmailWithPrimaryMembership(command.email);
 
+    // A real, active account with no passwordHash means it has only ever signed in via Google --
+    // tell them that directly instead of a generic "invalid password" that reads as a typo to
+    // retry forever. Still gated on isActive/membership so this can't be used to enumerate
+    // deactivated or membership-less accounts beyond what the generic error already implies.
+    if (result && result.user.isActive && result.membership && !result.user.passwordHash) {
+      throw new UnauthorizedException(
+        'This account signs in with Google. Use "Sign in with Google" below, or reset your password to add one.',
+      );
+    }
+
     const passwordHash = result?.user.passwordHash ?? DUMMY_HASH;
     const passwordValid = await this.passwordHasher.verify(passwordHash, command.password);
 
