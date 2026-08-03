@@ -5,6 +5,7 @@ export * from './fetch-external-projects.query';
 export * from './fetch-external-boards.query';
 export * from './fetch-external-active-sprints.query';
 export * from './fetch-external-issue-detail.query';
+export * from './fetch-external-sprint-issues.query';
 export * from './resolve-external-user.query';
 
 import { ListIntegrationConnectionsHandler } from './list-integration-connections.query';
@@ -13,6 +14,7 @@ import { FetchExternalProjectsHandler } from './fetch-external-projects.query';
 import { FetchExternalBoardsHandler } from './fetch-external-boards.query';
 import { FetchExternalActiveSprintsHandler } from './fetch-external-active-sprints.query';
 import { FetchExternalIssueDetailHandler } from './fetch-external-issue-detail.query';
+import { FetchExternalSprintIssuesHandler } from './fetch-external-sprint-issues.query';
 import { ResolveExternalUserHandler } from './resolve-external-user.query';
 
 export const INTEGRATION_QUERY_HANDLERS = [
@@ -22,5 +24,6 @@ export const INTEGRATION_QUERY_HANDLERS = [
   FetchExternalBoardsHandler,
   FetchExternalActiveSprintsHandler,
   FetchExternalIssueDetailHandler,
+  FetchExternalSprintIssuesHandler,
   ResolveExternalUserHandler,
 ];

@@ -15,6 +15,12 @@ export class RecordExecutionCommand {
     public readonly status: ExecutionStatus,
     public readonly notes?: string,
     public readonly evidenceUrl?: string,
+    public readonly actualResult?: string,
+    public readonly attachmentUrls?: string[],
+    public readonly screenshotUrls?: string[],
+    public readonly defectReference?: string,
+    public readonly executionDurationMs?: number,
+    public readonly testerName?: string,
   ) {}
 }
 
@@ -38,6 +44,12 @@ export class RecordExecutionHandler implements ICommandHandler<RecordExecutionCo
       executedBy: command.executedBy,
       notes: command.notes,
       evidenceUrl: command.evidenceUrl,
+      actualResult: command.actualResult,
+      attachmentUrls: command.attachmentUrls,
+      screenshotUrls: command.screenshotUrls,
+      defectReference: command.defectReference,
+      executionDurationMs: command.executionDurationMs,
+      testerName: command.testerName,
     });
   }
 }

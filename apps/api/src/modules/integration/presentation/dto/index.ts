@@ -6,4 +6,5 @@ export * from './test-connection-result.dto';
 export * from './external-project.dto';
 export * from './external-board.dto';
 export * from './external-sprint-option.dto';
+export * from './external-issue-summary.dto';
 export * from './integration-connection.dto';

@@ -48,6 +48,22 @@ export interface ExternalActiveSprintPayload {
   endDate: Date | null;
 }
 
+// Smart Sprint Import (§2) picker payload -- see fetchSprintIssuesSummary.
+export interface ExternalIssueSummaryPayload {
+  externalId: string;
+  title: string;
+  issueType: string;
+  epicKey: string | null;
+  epicName: string | null;
+  labels: string[];
+  assignee: string | null;
+}
+
+export interface ExternalIssueLinkPayload {
+  type: string;
+  externalId: string;
+}
+
 // Full single-issue detail for deep AI analysis (Requirement Intelligence "Analyze story"), as
 // opposed to ExternalStoryPayload's thin sprint-import subset. Attachments are metadata only --
 // no binary content is fetched or sent to the AI. additionalCustomFields carries through any
@@ -79,6 +95,7 @@ export interface ExternalIssueDetailPayload {
   labels: string[];
   components: string[];
   epic: string | null;
+  epicKey: string | null;
   parent: string | null;
   storyPoints: number | null;
   dueDate: Date | null;
@@ -88,6 +105,11 @@ export interface ExternalIssueDetailPayload {
   comments: ExternalIssueCommentPayload[];
   attachments: ExternalIssueAttachmentPayload[];
   additionalCustomFields: Record<string, unknown>;
+  // Smart Sprint Import (§2): issue-type classification (Story/Task/Bug/Sub-task/Epic) and Jira
+  // issue links (mapped to Dependency rows when both ends of a link were imported in the same
+  // batch -- see ImportSprintFromJiraHandler).
+  issueType: string;
+  links: ExternalIssueLinkPayload[];
 }
 
 // Implemented once per external system (Jira first -- Solution Architecture §18's reference
@@ -124,6 +146,12 @@ export interface IIntegrationConnector {
     credentials: ConnectorCredentials,
     config: Record<string, unknown>,
   ): Promise<ExternalIssueDetailPayload>;
+  /** Smart Sprint Import (§2) picker -- cheap listing of every issue in a sprint. */
+  fetchSprintIssuesSummary(
+    reference: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalIssueSummaryPayload[]>;
   /** Posts an ADF-formatted comment (BA Review Workflow) -- caller builds the ADF doc, incl. any mention nodes. */
   postComment(
     externalId: string,

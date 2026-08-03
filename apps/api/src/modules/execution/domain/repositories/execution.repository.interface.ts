@@ -9,6 +9,12 @@ export interface RecordExecutionInput {
   executedBy: string;
   notes?: string;
   evidenceUrl?: string;
+  actualResult?: string;
+  attachmentUrls?: string[];
+  screenshotUrls?: string[];
+  defectReference?: string;
+  executionDurationMs?: number;
+  testerName?: string;
 }
 
 export interface IExecutionRepository {

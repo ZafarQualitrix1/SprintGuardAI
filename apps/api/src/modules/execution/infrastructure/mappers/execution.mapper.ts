@@ -14,5 +14,11 @@ export function toExecutionEntity(row: ExecutionWithTestCase): ExecutionEntity {
     row.executedAt,
     row.notes,
     row.evidenceUrl,
+    row.actualResult,
+    (row.attachmentUrls as unknown as string[] | null) ?? [],
+    (row.screenshotUrls as unknown as string[] | null) ?? [],
+    row.defectReference,
+    row.executionDurationMs,
+    row.testerName,
   );
 }

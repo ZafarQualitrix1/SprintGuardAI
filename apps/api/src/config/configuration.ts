@@ -22,8 +22,21 @@ export default () => ({
   credentialVault: {
     encryptionKey: process.env.CREDENTIAL_ENCRYPTION_KEY,
   },
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'org-assets',
+  },
   internal: {
     cronSecret: process.env.INTERNAL_CRON_SECRET,
+  },
+  // Automation Execution Module (§9/§10): dispatches .github/workflows/automation-execution.yml
+  // in this same repo via workflow_dispatch. Requires a PAT (or GitHub App token) with
+  // `actions:write` on GITHUB_ACTIONS_REPO -- optional so unrelated boots don't hard-fail if
+  // unset; TriggerAutomationExecutionCommand surfaces a clear error if a run is attempted without it.
+  githubActions: {
+    token: process.env.GITHUB_ACTIONS_TOKEN,
+    repo: process.env.GITHUB_ACTIONS_REPO,
   },
   ai: {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,

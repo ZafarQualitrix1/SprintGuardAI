@@ -18,6 +18,17 @@ export interface CreateStoryInput {
   status: StoryStatus;
   priority: string | null;
   assignee: string | null;
+  // Smart Sprint Import (§2) enrichment -- all optional so manual/thin story creation call sites
+  // (fetchSprint's default fields-only path) keep working unchanged.
+  issueType?: string;
+  epicKey?: string | null;
+  epicName?: string | null;
+  labels?: string[];
+  components?: string[];
+  raw?: Record<string, unknown> | null;
+  /** Sub-task's parent issue key -- resolved to a DB parentStoryId after all stories in the batch
+   * are upserted, since the parent may be created in the very same import. */
+  parentExternalId?: string | null;
 }
 
 export interface UpsertSprintWithStoriesInput {

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@sprintguard/database';
+import { Prisma, PrismaService } from '@sprintguard/database';
 import {
   IExecutionRepository,
   RecordExecutionInput,
@@ -20,6 +20,12 @@ export class PrismaExecutionRepository implements IExecutionRepository {
         executedAt: new Date(),
         notes: input.notes,
         evidenceUrl: input.evidenceUrl,
+        actualResult: input.actualResult,
+        attachmentUrls: (input.attachmentUrls ?? undefined) as unknown as Prisma.InputJsonValue,
+        screenshotUrls: (input.screenshotUrls ?? undefined) as unknown as Prisma.InputJsonValue,
+        defectReference: input.defectReference,
+        executionDurationMs: input.executionDurationMs,
+        testerName: input.testerName,
       },
       include: { testCase: true },
     });

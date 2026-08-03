@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ImportWizardStep } from '@/features/integration/types';
+import type { SmartImportSelection } from '@sprintguard/shared';
 import { StepWorkspace } from './step-workspace';
 import { StepProject } from './step-project';
 import { StepBoard } from './step-board';
 import { StepSprint } from './step-sprint';
+import { StepSelection } from './step-selection';
 import { StepImport } from './step-import';
 
 const STEPS: { id: ImportWizardStep; label: string }[] = [
@@ -15,6 +17,7 @@ const STEPS: { id: ImportWizardStep; label: string }[] = [
   { id: 'project', label: 'Project' },
   { id: 'board', label: 'Board' },
   { id: 'sprint', label: 'Sprint' },
+  { id: 'selection', label: 'Selection' },
   { id: 'import', label: 'Import' },
 ];
 
@@ -27,6 +30,7 @@ export interface WizardSelection {
   boardName?: string;
   sprintExternalId?: string;
   sprintName?: string;
+  smartImport?: SmartImportSelection;
 }
 
 export function ImportWizard() {
@@ -117,6 +121,16 @@ export function ImportWizard() {
       ) : null}
       {step === 'sprint' ? (
         <StepSprint
+          selection={selection}
+          onSelect={(patch) => {
+            patchSelection(patch);
+            next();
+          }}
+          onBack={back}
+        />
+      ) : null}
+      {step === 'selection' ? (
+        <StepSelection
           selection={selection}
           onSelect={(patch) => {
             patchSelection(patch);

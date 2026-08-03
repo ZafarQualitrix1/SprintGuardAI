@@ -59,6 +59,7 @@ export function StepImport({ selection, onBack }: StepImportProps) {
         projectId,
         connectionId: selection.connectionId,
         reference: selection.sprintExternalId,
+        smartImport: selection.smartImport,
       });
       toast({ title: 'Sprint imported', description: `${sprint.name} — ${sprint.stories.length} stories` });
       router.push(`/dashboard/sprints/${sprint.id}` as never);

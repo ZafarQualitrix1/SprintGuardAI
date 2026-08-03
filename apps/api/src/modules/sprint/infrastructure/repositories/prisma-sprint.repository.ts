@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@sprintguard/database';
+import { Prisma, PrismaService } from '@sprintguard/database';
 import {
+  CreateStoryInput,
   ISprintRepository,
   RecordSyncEventInput,
   SprintSyncResult,
@@ -8,6 +9,66 @@ import {
 } from '../../domain/repositories/sprint.repository.interface';
 import { SprintEntity, SprintSyncEventEntity, SprintWithStories } from '../../domain/entities/sprint.entity';
 import { toSprintEntity, toSprintSyncEventEntity, toStoryEntity } from '../mappers';
+
+// Shared field set for both story.create's `data` and story.upsert's `create`/`update` branches
+// (create needs sprintId/source/externalId too, added by callers; update doesn't touch those).
+function storyCreateFields(story: CreateStoryInput) {
+  return {
+    externalId: story.externalId,
+    title: story.title,
+    description: story.description,
+    storyPoints: story.storyPoints,
+    status: story.status,
+    priority: story.priority,
+    assignee: story.assignee,
+    issueType: story.issueType ?? 'Story',
+    epicKey: story.epicKey ?? null,
+    epicName: story.epicName ?? null,
+    labels: (story.labels ?? undefined) as unknown as Prisma.InputJsonValue,
+    components: (story.components ?? undefined) as unknown as Prisma.InputJsonValue,
+    raw: (story.raw ?? undefined) as unknown as Prisma.InputJsonValue,
+  };
+}
+
+function storyUpdateFields(story: CreateStoryInput) {
+  return {
+    title: story.title,
+    description: story.description,
+    storyPoints: story.storyPoints,
+    status: story.status,
+    priority: story.priority,
+    assignee: story.assignee,
+    issueType: story.issueType ?? 'Story',
+    epicKey: story.epicKey ?? null,
+    epicName: story.epicName ?? null,
+    ...(story.labels !== undefined ? { labels: story.labels as unknown as Prisma.InputJsonValue } : {}),
+    ...(story.components !== undefined ? { components: story.components as unknown as Prisma.InputJsonValue } : {}),
+    ...(story.raw !== undefined ? { raw: story.raw as unknown as Prisma.InputJsonValue } : {}),
+  };
+}
+
+// Sub-tasks (§2 Smart Import) carry their parent issue's externalId, resolved to a DB
+// parentStoryId here -- after the loop above, since the parent may have been created in this very
+// same batch. Silently no-ops for a story whose parent wasn't part of this import (parentStoryId
+// stays null rather than failing the whole import over an out-of-scope parent).
+async function resolveSubtaskParents(
+  tx: Prisma.TransactionClient,
+  sprintId: string,
+  stories: CreateStoryInput[],
+): Promise<void> {
+  for (const story of stories) {
+    if (!story.parentExternalId || !story.externalId) continue;
+    const parent = await tx.story.findUnique({
+      where: { sprintId_externalId: { sprintId, externalId: story.parentExternalId } },
+      select: { id: true },
+    });
+    if (!parent) continue;
+    await tx.story.update({
+      where: { sprintId_externalId: { sprintId, externalId: story.externalId } },
+      data: { parentStoryId: parent.id },
+    });
+  }
+}
 
 @Injectable()
 export class PrismaSprintRepository implements ISprintRepository {
@@ -60,47 +121,22 @@ export class PrismaSprintRepository implements ISprintRepository {
           });
           const row = await tx.story.upsert({
             where: { sprintId_externalId: { sprintId: sprint.id, externalId: story.externalId } },
-            create: {
-              sprintId: sprint.id,
-              externalId: story.externalId,
-              title: story.title,
-              description: story.description,
-              storyPoints: story.storyPoints,
-              status: story.status,
-              priority: story.priority,
-              assignee: story.assignee,
-              source: input.source,
-            },
-            update: {
-              title: story.title,
-              description: story.description,
-              storyPoints: story.storyPoints,
-              status: story.status,
-              priority: story.priority,
-              assignee: story.assignee,
-            },
+            create: { sprintId: sprint.id, source: input.source, ...storyCreateFields(story) },
+            update: storyUpdateFields(story),
           });
           stories.push(row);
           if (existingStory) storiesUpdated += 1;
           else storiesCreated += 1;
         } else {
           const row = await tx.story.create({
-            data: {
-              sprintId: sprint.id,
-              externalId: null,
-              title: story.title,
-              description: story.description,
-              storyPoints: story.storyPoints,
-              status: story.status,
-              priority: story.priority,
-              assignee: story.assignee,
-              source: input.source,
-            },
+            data: { sprintId: sprint.id, source: input.source, ...storyCreateFields(story) },
           });
           stories.push(row);
           storiesCreated += 1;
         }
       }
+
+      await resolveSubtaskParents(tx, sprint.id, input.stories);
 
       return { sprint, stories, storiesCreated, storiesUpdated, wasNewSprint: !existingSprint };
     });
@@ -132,23 +168,14 @@ export class PrismaSprintRepository implements ISprintRepository {
         },
       });
 
-      const stories = await Promise.all(
-        input.stories.map((story) =>
-          tx.story.create({
-            data: {
-              sprintId: sprint.id,
-              externalId: story.externalId,
-              title: story.title,
-              description: story.description,
-              storyPoints: story.storyPoints,
-              status: story.status,
-              priority: story.priority,
-              assignee: story.assignee,
-              source: input.source,
-            },
-          }),
-        ),
-      );
+      const stories = [];
+      for (const story of input.stories) {
+        const row = await tx.story.create({
+          data: { sprintId: sprint.id, source: input.source, ...storyCreateFields(story) },
+        });
+        stories.push(row);
+      }
+      await resolveSubtaskParents(tx, sprint.id, input.stories);
 
       return { sprint, stories };
     });

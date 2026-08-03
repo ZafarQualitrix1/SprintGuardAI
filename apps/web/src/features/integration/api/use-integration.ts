@@ -101,3 +101,12 @@ export function useExternalSprints(connectionId: string | undefined, boardId: st
     enabled: Boolean(connectionId) && Boolean(boardId),
   });
 }
+
+// Smart Sprint Import (§2) picker step.
+export function useExternalSprintIssues(connectionId: string | undefined, reference: string | undefined) {
+  return useQuery({
+    queryKey: ['integrations', 'sprint-issues', connectionId, reference],
+    queryFn: () => integrationApi.fetchSprintIssues(connectionId!, reference!),
+    enabled: Boolean(connectionId) && Boolean(reference),
+  });
+}

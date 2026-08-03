@@ -1,0 +1,157 @@
+name: Automation Execution
+
+# Runs AI-generated Playwright automation on demand (Enterprise Sprint Quality Platform §9/§10).
+# Dispatched by TriggerAutomationExecutionCommand (apps/api) via workflow_dispatch, since the API
+# itself runs on Vercel serverless and cannot host a long-lived Playwright/browser process --
+# same "GitHub Actions as automation backbone" pattern as deploy-uat.yml/db-migrate.yml/
+# integration-health-check.yml already in this repo.
+#
+# Requires the INTERNAL_CRON_SECRET repository secret (same one integration-health-check.yml
+# already uses) -- the API's callback endpoints are protected by the same InternalSecretGuard.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runId:
+        required: true
+        description: SprintGuard AutomationExecutionRun id
+      automationGenerationId:
+        required: true
+      automationType:
+        required: true
+        description: API or UI
+      environment:
+        required: true
+      browser:
+        required: false
+        description: chromium | firefox | webkit (UI runs only)
+      tags:
+        required: false
+      parallelWorkers:
+        required: true
+        default: '1'
+      callbackBaseUrl:
+        required: true
+        description: https://.../api/v1/internal/automation-execution/{runId}
+
+run-name: "sprintguard-${{ inputs.runId }} (${{ inputs.automationType }})"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Notify SprintGuard the run has started
+        run: |
+          curl -sS -f -X POST "${{ inputs.callbackBaseUrl }}/callback" \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"phase\":\"STARTED\",\"githubRunId\":\"${{ github.run_id }}\",\"githubRunUrl\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}"
+
+      - name: Fetch generated automation files
+        run: |
+          curl -sS -f "${{ inputs.callbackBaseUrl }}/files" \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_CRON_SECRET }}" \
+            -o files.json
+
+      - name: Write automation files to disk
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+          const files = JSON.parse(fs.readFileSync('files.json', 'utf-8'));
+          for (const file of files) {
+            const target = path.join('workspace', file.path);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, file.content);
+          }
+          console.log(`Wrote ${files.length} files to ./workspace`);
+          EOF
+
+      - name: Install dependencies
+        working-directory: workspace
+        run: |
+          npm init -y > /dev/null
+          npm install --no-save @playwright/test dotenv
+
+      - name: Install Playwright browsers
+        working-directory: workspace
+        run: |
+          if [ "${{ inputs.automationType }}" = "UI" ]; then
+            npx playwright install --with-deps "${{ inputs.browser }}"
+          fi
+
+      - name: Run Playwright tests
+        id: run_tests
+        working-directory: workspace
+        continue-on-error: true
+        env:
+          CI: 'true'
+        run: |
+          npx playwright test \
+            --workers="${{ inputs.parallelWorkers }}" \
+            --project="${{ inputs.browser }}" \
+            --reporter=json,html \
+            > /dev/null 2> stderr.log || true
+          cp test-results.json ../test-results.json 2>/dev/null || echo '{}' > ../test-results.json
+
+      - name: Upload HTML report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ inputs.runId }}
+          path: workspace/playwright-report
+          retention-days: 30
+
+      - name: Summarize results and notify SprintGuard
+        if: always()
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          let report = {};
+          try { report = JSON.parse(fs.readFileSync('test-results.json', 'utf-8')); } catch {}
+
+          const specs = [];
+          const walk = (suite) => {
+            for (const spec of suite.specs ?? []) {
+              const test = spec.tests?.[0];
+              const result = test?.results?.[0];
+              specs.push({
+                title: spec.title,
+                status: result?.status === 'passed' ? 'PASSED' : result?.status === 'skipped' ? 'SKIPPED' : 'FAILED',
+                durationMs: result?.duration ?? 0,
+                error: result?.error?.message,
+              });
+            }
+            for (const child of suite.suites ?? []) walk(child);
+          };
+          for (const suite of report.suites ?? []) walk(suite);
+
+          const passed = specs.filter((s) => s.status === 'PASSED').length;
+          const failed = specs.filter((s) => s.status === 'FAILED').length;
+          const skipped = specs.filter((s) => s.status === 'SKIPPED').length;
+          const status = specs.length === 0 ? 'ERROR' : failed > 0 ? 'FAILED' : 'PASSED';
+
+          const payload = {
+            phase: 'COMPLETED',
+            status,
+            totalTests: specs.length,
+            passedTests: passed,
+            failedTests: failed,
+            skippedTests: skipped,
+            testResults: specs,
+            reportArtifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            errorMessage: specs.length === 0 ? 'No tests were discovered or the run crashed before producing a report.' : undefined,
+          };
+          fs.writeFileSync('callback-payload.json', JSON.stringify(payload));
+          EOF
+
+          curl -sS -f -X POST "${{ inputs.callbackBaseUrl }}/callback" \
+            -H "Authorization: Bearer ${{ secrets.INTERNAL_CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d @callback-payload.json

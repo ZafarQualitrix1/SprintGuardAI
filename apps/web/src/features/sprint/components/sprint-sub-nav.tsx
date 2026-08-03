@@ -14,7 +14,8 @@ const TABS = [
   { label: 'Coverage', suffix: 'coverage' },
   { label: 'Test Generator', suffix: 'test-generator' },
   { label: 'Automation', suffix: 'automation' },
-  { label: 'Executions', suffix: 'executions' },
+  { label: 'Manual Execution', suffix: 'executions' },
+  { label: 'Automation Execution', suffix: 'automation-execution' },
   { label: 'Release Readiness', suffix: 'release-readiness' },
 ] as const;
 

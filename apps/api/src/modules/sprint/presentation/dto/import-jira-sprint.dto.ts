@@ -1,5 +1,7 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { SmartImportSelectionDto } from './smart-import-selection.dto';
 
 export class ImportJiraSprintDto {
   @ApiProperty()
@@ -14,4 +16,13 @@ export class ImportJiraSprintDto {
   @IsString()
   @MinLength(1)
   reference!: string;
+
+  @ApiPropertyOptional({
+    type: SmartImportSelectionDto,
+    description: 'Smart Sprint Import (§2) selection -- omit to import everything with default fields.',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SmartImportSelectionDto)
+  smartImport?: SmartImportSelectionDto;
 }

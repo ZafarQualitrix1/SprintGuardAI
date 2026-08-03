@@ -20,10 +20,21 @@ export const envSchema = z.object({
 
   CREDENTIAL_ENCRYPTION_KEY: z.string().min(16),
 
+  // Powers Organization Settings' logo upload (Supabase Storage). Optional so unrelated boots
+  // don't hard-fail if unset -- the upload endpoint itself rejects clearly if hit while unconfigured.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_STORAGE_BUCKET: z.string().optional(),
+
   // Guards the internal health-check sweep endpoint (InternalSecretGuard) -- optional so unrelated
   // boots don't hard-fail if unset; the guard itself rejects clearly if the endpoint is hit while
   // this is unconfigured.
   INTERNAL_CRON_SECRET: z.string().min(16).optional(),
+
+  // Automation Execution Module (§9/§10) -- optional so unrelated boots don't hard-fail if unset;
+  // TriggerAutomationExecutionCommand rejects clearly if a run is attempted while unconfigured.
+  GITHUB_ACTIONS_TOKEN: z.string().optional(),
+  GITHUB_ACTIONS_REPO: z.string().optional(),
 
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),

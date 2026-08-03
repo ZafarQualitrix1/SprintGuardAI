@@ -118,7 +118,14 @@ export class SprintsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SprintDetailDto> {
     const result = await this.commandBus.execute<ImportSprintFromJiraCommand, SprintWithStories>(
-      new ImportSprintFromJiraCommand(user.organizationId, dto.projectId, dto.connectionId, dto.reference, user.userId),
+      new ImportSprintFromJiraCommand(
+        user.organizationId,
+        dto.projectId,
+        dto.connectionId,
+        dto.reference,
+        user.userId,
+        dto.smartImport,
+      ),
     );
     return toSprintDetailDto(result);
   }

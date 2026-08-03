@@ -18,10 +18,12 @@ import { ListIntegrationConnectionsQuery } from '../application/queries/list-int
 import { FetchExternalProjectsQuery } from '../application/queries/fetch-external-projects.query';
 import { FetchExternalBoardsQuery } from '../application/queries/fetch-external-boards.query';
 import { FetchExternalActiveSprintsQuery } from '../application/queries/fetch-external-active-sprints.query';
+import { FetchExternalSprintIssuesQuery } from '../application/queries/fetch-external-sprint-issues.query';
 import { IntegrationConnectionEntity } from '../domain/entities/integration-connection.entity';
 import {
   ExternalActiveSprintPayload,
   ExternalBoardPayload,
+  ExternalIssueSummaryPayload,
   ExternalProjectPayload,
 } from '../application/ports/integration-connector.port';
 import { IntegrationConnectionDto } from './dto/integration-connection.dto';
@@ -201,6 +203,19 @@ export class IntegrationsController {
   ): Promise<ExternalActiveSprintPayload[]> {
     return this.queryBus.execute<FetchExternalActiveSprintsQuery, ExternalActiveSprintPayload[]>(
       new FetchExternalActiveSprintsQuery(user.organizationId, id, boardId),
+    );
+  }
+
+  // Smart Sprint Import (§2) picker step.
+  @Get(':id/sprint-issues')
+  @RequirePermission('integration:manage')
+  async sprintIssues(
+    @Param('id') id: string,
+    @Query('reference') reference: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ExternalIssueSummaryPayload[]> {
+    return this.queryBus.execute<FetchExternalSprintIssuesQuery, ExternalIssueSummaryPayload[]>(
+      new FetchExternalSprintIssuesQuery(user.organizationId, id, reference),
     );
   }
 }

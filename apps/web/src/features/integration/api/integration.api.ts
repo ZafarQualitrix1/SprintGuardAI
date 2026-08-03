@@ -1,6 +1,7 @@
 import type {
   ConnectJiraInput,
   ExternalBoard,
+  ExternalIssueSummary,
   ExternalProject,
   ExternalSprintOption,
   IntegrationConnection,
@@ -30,4 +31,6 @@ export const integrationApi = {
     apiClient.get<ExternalBoard[]>(`/integrations/${id}/boards?projectKey=${encodeURIComponent(projectKey)}`),
   fetchSprints: (id: string, boardId: string) =>
     apiClient.get<ExternalSprintOption[]>(`/integrations/${id}/sprints?boardId=${encodeURIComponent(boardId)}`),
+  fetchSprintIssues: (id: string, reference: string) =>
+    apiClient.get<ExternalIssueSummary[]>(`/integrations/${id}/sprint-issues?reference=${encodeURIComponent(reference)}`),
 };

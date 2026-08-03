@@ -12,7 +12,46 @@ export const importJiraSprintSchema = z.object({
   connectionId: z.string().min(1, 'Connect a Jira account first'),
   reference: z.string().min(1, 'Paste a sprint id or board URL'),
 });
-export type ImportJiraSprintInput = z.infer<typeof importJiraSprintSchema>;
+
+// Smart Sprint Import (§2). Plain TS (not zod-validated client-side, since it's built entirely
+// from UI state, not a user-typed form) -- the backend's SmartImportSelectionDto is the real gate.
+export type SmartImportMode = 'ENTIRE' | 'SELECTED' | 'BY_EPIC' | 'BY_LABEL' | 'BY_ASSIGNEE';
+
+export interface SmartImportSelection {
+  mode: SmartImportMode;
+  selectedExternalIds?: string[];
+  epicName?: string;
+  label?: string;
+  assignee?: string;
+  includeEpics: boolean;
+  includeUserStories: boolean;
+  includeTasks: boolean;
+  includeSubtasks: boolean;
+  includeBugs: boolean;
+  includeSprintDetails: boolean;
+  includeAcceptanceCriteria: boolean;
+  includeStoryLinks: boolean;
+  includeLabels: boolean;
+  includeComponents: boolean;
+  includeStoryPoints: boolean;
+  includeAssignees: boolean;
+  includeAttachments: boolean;
+  includeComments: boolean;
+}
+
+export type ImportJiraSprintInput = z.infer<typeof importJiraSprintSchema> & {
+  smartImport?: SmartImportSelection;
+};
+
+export interface ExternalIssueSummary {
+  externalId: string;
+  title: string;
+  issueType: string;
+  epicKey: string | null;
+  epicName: string | null;
+  labels: string[];
+  assignee: string | null;
+}
 
 export interface Project {
   id: string;

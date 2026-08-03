@@ -23,7 +23,20 @@ export class TestCaseExecutionsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ExecutionDto> {
     const execution = await this.commandBus.execute<RecordExecutionCommand, ExecutionEntity>(
-      new RecordExecutionCommand(user.organizationId, testCaseId, user.userId, dto.status, dto.notes, dto.evidenceUrl),
+      new RecordExecutionCommand(
+        user.organizationId,
+        testCaseId,
+        user.userId,
+        dto.status,
+        dto.notes,
+        dto.evidenceUrl,
+        dto.actualResult,
+        dto.attachmentUrls,
+        dto.screenshotUrls,
+        dto.defectReference,
+        dto.executionDurationMs,
+        dto.testerName,
+      ),
     );
     return toExecutionDto(execution);
   }

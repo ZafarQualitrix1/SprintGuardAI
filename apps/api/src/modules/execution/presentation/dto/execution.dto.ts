@@ -9,4 +9,10 @@ export class ExecutionDto {
   @ApiPropertyOptional({ nullable: true }) executedAt!: string | null;
   @ApiPropertyOptional({ nullable: true }) notes!: string | null;
   @ApiPropertyOptional({ nullable: true }) evidenceUrl!: string | null;
+  @ApiPropertyOptional({ nullable: true }) actualResult!: string | null;
+  @ApiProperty({ type: [String] }) attachmentUrls!: string[];
+  @ApiProperty({ type: [String] }) screenshotUrls!: string[];
+  @ApiPropertyOptional({ nullable: true }) defectReference!: string | null;
+  @ApiPropertyOptional({ nullable: true }) executionDurationMs!: number | null;
+  @ApiPropertyOptional({ nullable: true }) testerName!: string | null;
 }

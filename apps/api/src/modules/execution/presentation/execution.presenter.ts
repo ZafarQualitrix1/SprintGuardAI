@@ -11,5 +11,11 @@ export function toExecutionDto(entity: ExecutionEntity): ExecutionDto {
     executedAt: entity.executedAt?.toISOString() ?? null,
     notes: entity.notes,
     evidenceUrl: entity.evidenceUrl,
+    actualResult: entity.actualResult,
+    attachmentUrls: entity.attachmentUrls,
+    screenshotUrls: entity.screenshotUrls,
+    defectReference: entity.defectReference,
+    executionDurationMs: entity.executionDurationMs,
+    testerName: entity.testerName,
   };
 }

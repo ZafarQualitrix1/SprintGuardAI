@@ -23,6 +23,7 @@ import { TestIntelligenceModule } from './modules/test-intelligence/test-intelli
 import { BaReviewModule } from './modules/ba-review/ba-review.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AutomationModule } from './modules/automation/automation.module';
+import { AutomationExecutionModule } from './modules/automation-execution/automation-execution.module';
 import { ExecutionModule } from './modules/execution/execution.module';
 import { CoverageModule } from './modules/coverage/coverage.module';
 import { ReleaseModule } from './modules/release/release.module';
@@ -41,6 +42,8 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PlatformSaasModule } from './modules/platform-saas/platform-saas.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { OrganizationSettingsModule } from './modules/organization-settings/organization-settings.module';
+import { BackgroundJobsModule } from './modules/background-jobs/background-jobs.module';
 
 @Module({
   imports: [
@@ -80,6 +83,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     BaReviewModule,
     NotificationsModule,
     AutomationModule,
+    AutomationExecutionModule,
     ExecutionModule,
     CoverageModule,
     ReleaseModule,
@@ -98,6 +102,8 @@ import { PlatformModule } from './modules/platform/platform.module';
     RealtimeModule,
     PlatformSaasModule,
     PlatformModule,
+    OrganizationSettingsModule,
+    BackgroundJobsModule,
   ],
   providers: [
     // Order matters: JwtAuthGuard (AuthN) runs before PermissionsGuard (AuthZ), matching

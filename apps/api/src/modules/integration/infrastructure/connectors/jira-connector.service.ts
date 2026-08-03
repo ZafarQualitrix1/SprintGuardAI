@@ -6,6 +6,7 @@ import {
   ExternalIssueAttachmentPayload,
   ExternalIssueCommentPayload,
   ExternalIssueDetailPayload,
+  ExternalIssueSummaryPayload,
   ExternalProjectPayload,
   ExternalSprintPayload,
   ExternalStoryPayload,
@@ -72,6 +73,12 @@ interface JiraFieldMeta {
   custom: boolean;
 }
 
+interface JiraIssueLinkResponse {
+  type?: { name?: string };
+  outwardIssue?: { key: string };
+  inwardIssue?: { key: string };
+}
+
 interface JiraIssueDetailFields {
   summary: string;
   description?: string | JiraAdfNode | null;
@@ -88,6 +95,8 @@ interface JiraIssueDetailFields {
   parent?: { key: string; fields?: { summary?: string; issuetype?: { name?: string } } };
   comment?: { comments: JiraCommentResponse[] };
   attachment?: JiraAttachmentResponse[];
+  issuetype?: { name?: string };
+  issuelinks?: JiraIssueLinkResponse[];
   [customFieldOrStandardKey: string]: unknown;
 }
 
@@ -145,6 +154,26 @@ interface JiraIssueSearchResponse {
   maxResults: number;
   total: number;
   issues: JiraIssue[];
+}
+
+// Lightweight per-issue shape for Smart Import's picker (§2) -- summary,issuetype,parent,labels,
+// assignee only, so the picker's initial fetch stays cheap even for a large sprint.
+interface JiraIssueSummary {
+  key: string;
+  fields: {
+    summary: string;
+    issuetype?: { name?: string };
+    parent?: { key: string; fields?: { summary?: string; issuetype?: { name?: string } } };
+    labels?: string[];
+    assignee?: { displayName?: string } | null;
+  };
+}
+
+interface JiraIssueSummarySearchResponse {
+  startAt: number;
+  maxResults: number;
+  total: number;
+  issues: JiraIssueSummary[];
 }
 
 const MAX_ISSUES = 500;
@@ -422,6 +451,58 @@ export class JiraConnectorService implements IIntegrationConnector {
     };
   }
 
+  // Smart Sprint Import (§2) step: a cheap, wide listing of every issue in the sprint (key, title,
+  // issue type, epic, labels, assignee) that powers the picker UI -- selecting specific issues, or
+  // computing the distinct epics/labels/assignees for "Import by Epic/Label/Assignee". Deliberately
+  // thinner than fetchSprint's already-thin ExternalStoryPayload (no description/points/status),
+  // since the picker only ever needs to render a checklist, not full story data.
+  async fetchSprintIssuesSummary(
+    reference: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalIssueSummaryPayload[]> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+    const sprintId = await this.resolveSprintId(reference, jiraConfig, jiraCredentials);
+
+    const results: ExternalIssueSummaryPayload[] = [];
+    let startAt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const response = (await fetch(
+        `${jiraConfig.siteUrl}/rest/agile/1.0/sprint/${sprintId}/issue?startAt=${startAt}&maxResults=${PAGE_SIZE}&fields=summary,issuetype,parent,labels,assignee`,
+        { headers },
+      )) as unknown as FetchResponse;
+      if (!response.ok) {
+        throw new Error(`Failed to fetch issues for Jira sprint ${sprintId} (HTTP ${response.status})`);
+      }
+      const page = (await response.json()) as JiraIssueSummarySearchResponse;
+
+      results.push(
+        ...page.issues.map((issue): ExternalIssueSummaryPayload => {
+          const isParentEpic = issue.fields.parent?.fields?.issuetype?.name === 'Epic';
+          return {
+            externalId: issue.key,
+            title: issue.fields.summary,
+            issueType: issue.fields.issuetype?.name ?? 'Story',
+            epicKey: isParentEpic ? (issue.fields.parent?.key ?? null) : null,
+            epicName: isParentEpic ? (issue.fields.parent?.fields?.summary ?? issue.fields.parent?.key ?? null) : null,
+            labels: issue.fields.labels ?? [],
+            assignee: issue.fields.assignee?.displayName ?? null,
+          };
+        }),
+      );
+
+      startAt += page.issues.length;
+      if (page.issues.length === 0 || startAt >= page.total || startAt >= MAX_ISSUES) {
+        break;
+      }
+    }
+
+    return results;
+  }
+
   // Best-effort: if the field-metadata lookup fails for any reason, callers just get no
   // acceptance-criteria custom field match, not a hard failure of the whole issue fetch.
   private async resolveAcceptanceCriteriaFieldId(
@@ -518,6 +599,14 @@ export class JiraConnectorService implements IIntegrationConnector {
       }
     }
 
+    const isParentEpic = fields.parent?.fields?.issuetype?.name === 'Epic';
+    const links = (fields.issuelinks ?? [])
+      .map((link) => ({
+        type: link.type?.name ?? 'Relates',
+        externalId: link.outwardIssue?.key ?? link.inwardIssue?.key ?? '',
+      }))
+      .filter((link) => link.externalId.length > 0);
+
     return {
       externalId: issue.key,
       title: fields.summary,
@@ -529,7 +618,8 @@ export class JiraConnectorService implements IIntegrationConnector {
       reporter: fields.reporter?.displayName ?? null,
       labels: fields.labels ?? [],
       components: (fields.components ?? []).map((component) => component.name),
-      epic: fields.parent?.fields?.issuetype?.name === 'Epic' ? (fields.parent.fields.summary ?? fields.parent.key) : null,
+      epic: isParentEpic ? (fields.parent!.fields!.summary ?? fields.parent!.key) : null,
+      epicKey: isParentEpic ? fields.parent!.key : null,
       parent: fields.parent ? (fields.parent.fields?.summary ?? fields.parent.key) : null,
       storyPoints: (fields.customfield_10016 as number | null) ?? null,
       dueDate: fields.duedate ? toIsoDate(fields.duedate) : null,
@@ -539,6 +629,8 @@ export class JiraConnectorService implements IIntegrationConnector {
       comments,
       attachments,
       additionalCustomFields,
+      issueType: fields.issuetype?.name ?? 'Story',
+      links,
     };
   }
 

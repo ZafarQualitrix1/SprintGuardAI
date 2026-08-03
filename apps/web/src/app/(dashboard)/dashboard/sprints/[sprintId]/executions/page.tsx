@@ -27,7 +27,7 @@ export default function ExecutionDashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Execution Dashboard" description="Record and review test execution results for this sprint." />
+      <PageHeader title="Manual Execution" description="Record and review manual test execution results for this sprint." />
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />

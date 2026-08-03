@@ -46,6 +46,8 @@ model Organization {
   auditLogs              AuditLog[]
   notifications          NotificationEvent[]
   organizationMemory     OrganizationMemory?
+  organizationSettings   OrganizationSettings?
+  invitations            Invitation[]
 
   @@index([slug])
 }
@@ -57,6 +59,7 @@ model User {
   fullName     String
   avatarUrl    String?
   isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
@@ -79,6 +82,7 @@ model Role {
 
   memberships     Membership[]
   rolePermissions RolePermission[]
+  invitations     Invitation[]
 }
 
 model Permission {
@@ -285,6 +289,15 @@ model Story {
   assignee                    String?
   source                      SprintSource @default(MANUAL)
   raw                         Json?
+  // Smart Sprint Import (§2): issue-type/epic/label/component classification so import-by-epic/
+  // label/assignee filters and the "User Stories / Tasks / Subtasks / Bugs" content checkboxes
+  // have something structured to filter on, instead of only the free-form `raw` blob.
+  issueType                   String       @default("Story") // Story | Task | Bug | Sub-task | Epic | ...
+  epicKey                     String?
+  epicName                    String?
+  labels                      Json? // string[]
+  components                  Json? // string[]
+  parentStoryId               String? // Sub-task's parent issue, when imported as a distinct Story row
   assignedBaEmail             String? // Business Analyst assigned to review this story's AI-generated test cases
   assignedBaJiraAccountId     String? // resolved & cached Jira accountId for @mentions, cleared when assignedBaEmail changes
   assignedBaAccountResolvedAt DateTime?
@@ -292,6 +305,8 @@ model Story {
   updatedAt                   DateTime     @updatedAt
 
   sprint                     Sprint                      @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  parentStory                Story?                      @relation("StorySubtasks", fields: [parentStoryId], references: [id], onDelete: SetNull)
+  subtasks                   Story[]                     @relation("StorySubtasks")
   requirements               Requirement[]
   dependenciesFrom           Dependency[]                @relation("DependencyFrom")
   dependenciesTo             Dependency[]                @relation("DependencyTo")
@@ -304,6 +319,7 @@ model Story {
   @@unique([sprintId, externalId])
   @@index([sprintId])
   @@index([sprintId, status])
+  @@index([parentStoryId])
 }
 
 // Deep, Groq-generated business-analyst/QA-architect report for a single story: risks, edge
@@ -515,10 +531,59 @@ model AutomationGeneration {
   createdBy                 String?
   createdAt                 DateTime                   @default(now())
 
-  testCase TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  testCase      TestCase                 @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
+  executionRuns AutomationExecutionRun[]
 
   @@unique([testCaseId, automationType, version])
   @@index([testCaseId, automationType])
+}
+
+// Automation Execution Module (§9/§10): a run is dispatched as a GitHub Actions workflow_dispatch
+// (the same "GitHub Actions as automation backbone" pattern already used by deploy-uat.yml/
+// db-migrate.yml in this repo) since the API itself runs on Vercel serverless, which cannot host a
+// long-lived Playwright/browser process. The workflow POSTs its result back to a callback endpoint
+// on completion; githubRunId/githubRunUrl let the UI deep-link to the live GitHub Actions log for
+// anything this summary doesn't capture.
+enum AutomationExecutionStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  ERROR
+  CANCELLED
+}
+
+model AutomationExecutionRun {
+  id                     String                    @id @default(cuid())
+  organizationId         String
+  storyId                String
+  automationGenerationId String
+  automationType         AutomationType
+  environment            String
+  browser                String? // chromium | firefox | webkit -- null for API-only runs
+  tags                   Json? // string[]
+  parallelWorkers        Int                       @default(1)
+  status                 AutomationExecutionStatus @default(QUEUED)
+  githubRunId            String?
+  githubRunUrl           String?
+  totalTests             Int?
+  passedTests            Int?
+  failedTests            Int?
+  skippedTests           Int?
+  testResultsJson        Json? // per-test summary: { title, status, durationMs, error? }[]
+  logsText               String?
+  errorMessage           String?
+  reportArtifactUrl      String?
+  startedAt              DateTime?
+  completedAt            DateTime?
+  triggeredBy            String
+  createdAt              DateTime                  @default(now())
+
+  automationGeneration AutomationGeneration @relation(fields: [automationGenerationId], references: [id], onDelete: Cascade)
+
+  @@index([storyId])
+  @@index([automationGenerationId])
+  @@index([status])
 }
 
 // ============================================================================
@@ -726,15 +791,22 @@ enum ExecutionStatus {
 }
 
 model Execution {
-  id          String          @id @default(cuid())
-  testCaseId  String
-  sprintId    String
-  status      ExecutionStatus @default(NOT_RUN)
-  executedBy  String?
-  executedAt  DateTime?
-  notes       String?
-  evidenceUrl String?
-  createdAt   DateTime        @default(now())
+  id                  String          @id @default(cuid())
+  testCaseId          String
+  sprintId            String
+  status              ExecutionStatus @default(NOT_RUN)
+  executedBy          String?
+  executedAt          DateTime?
+  notes               String?
+  evidenceUrl         String?
+  createdAt           DateTime        @default(now())
+  // Manual Execution Module (§8) rich capture fields.
+  actualResult        String?
+  attachmentUrls      Json? // string[]
+  screenshotUrls      Json? // string[]
+  defectReference     String? // free-text ticket/bug reference, not a relational FK
+  executionDurationMs Int?
+  testerName          String?
 
   testCase TestCase @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
   sprint   Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
@@ -1629,6 +1701,109 @@ model TenantBranding {
   customDomain   String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Organization Settings module: single settings row per org (Solution Architecture extension).
+// Deliberately one wide table rather than split models -- every field here is a simple scalar
+// config value edited together from one settings page, not an independently-queried aggregate.
+model OrganizationSettings {
+  id             String @id @default(cuid())
+  organizationId String @unique
+
+  // Organization Profile
+  domain             String?
+  timezone           String  @default("UTC")
+  defaultLanguage    String  @default("en")
+  currency           String  @default("USD")
+  dateFormat         String  @default("YYYY-MM-DD")
+  workingDays        Json? // string[], e.g. ["MON",...,"FRI"] -- defaulted at the application layer
+  businessHoursStart String? @default("09:00")
+  businessHoursEnd   String? @default("18:00")
+
+  // Workspace Configuration
+  defaultProjectId          String?
+  defaultSprintDurationDays Int?    @default(14)
+  storyPointScale           Json? // number[], e.g. [1,2,3,5,8,13] -- defaulted at the application layer
+  autoSaveIntervalSeconds   Int?    @default(30)
+
+  // Jira Integration Settings (captured preferences -- sync-pipeline enforcement is follow-up)
+  importSprintsEnabled      Boolean @default(true)
+  importUserStoriesEnabled  Boolean @default(true)
+  importBugsEnabled         Boolean @default(true)
+  importTestEvidenceEnabled Boolean @default(false)
+  jiraAutoSyncEnabled       Boolean @default(false)
+
+  // Notification Settings
+  notifyEmail            Boolean @default(false)
+  notifySlack            Boolean @default(false)
+  notifyTeams            Boolean @default(false)
+  notifyBrowser          Boolean @default(true)
+  notifyRelease          Boolean @default(true)
+  notifySprintCompletion Boolean @default(true)
+  notifyBug              Boolean @default(true)
+  notifyAiGeneration     Boolean @default(true)
+  notifyBaApproval       Boolean @default(true)
+  slackWebhookEncrypted  String? // AES-256-GCM envelope
+  teamsWebhookEncrypted  String? // AES-256-GCM envelope
+
+  // Security Settings (2FA / per-device sessions deferred -- see plan)
+  sessionTimeoutMinutes    Int?    @default(60)
+  passwordMinLength        Int?    @default(10)
+  passwordRequireUppercase Boolean @default(true)
+  passwordRequireNumber    Boolean @default(true)
+  passwordRequireSymbol    Boolean @default(false)
+  allowedDomains           Json? // string[]
+  allowedIpRanges          Json? // string[]
+
+  // Automation Defaults
+  automationFramework            String? @default("playwright")
+  automationBrowser              String? @default("chromium")
+  automationHeadless             Boolean @default(true)
+  automationParallelExecution    Boolean @default(false)
+  automationRetryCount           Int?    @default(1)
+  automationReportFormat         String? @default("html")
+  automationScreenshotPolicy     String? @default("on-failure")
+  automationVideoPolicy          String? @default("off")
+  automationExecutionEnvironment String? @default("local")
+
+  // AI Organization Configuration (provider/model defaults + budget live in AiProviderConfig/
+  // UsageQuota, already built by the AI Settings module -- these are the org-wide toggles only)
+  aiPromptApprovalRequired Boolean @default(false)
+  aiLoggingEnabled         Boolean @default(true)
+  aiAuditTrailEnabled      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+// No email delivery exists in this codebase yet -- the invite flow generates a shareable link
+// (tokenHash stored, raw token only ever returned once in the invite response) that the admin
+// copies and sends manually, same honest workaround as ResetUserPasswordCommand.
+model Invitation {
+  id             String           @id @default(cuid())
+  organizationId String
+  email          String
+  roleId         String
+  tokenHash      String           @unique
+  invitedBy      String
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id])
+
+  @@index([organizationId, status])
 }
 
 // ============================================================================
