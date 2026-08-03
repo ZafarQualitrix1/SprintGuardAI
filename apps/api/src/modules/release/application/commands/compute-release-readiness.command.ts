@@ -49,10 +49,14 @@ export class ComputeReleaseReadinessHandler
     // "deterministic core never fails" principle, Solution Architecture §10.2).
     let executiveSummary: string | null = null;
     try {
+      // Explicit: capabilities without a provider fall through to the deployment's
+      // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
+      // before -- pinning to the one with a real, working key avoids depending on that.
       const result = await this.aiOrchestrationService.execute({
         capability: 'release-readiness-summary',
         agentKey: 'release-guardian-agent',
         organizationId: command.organizationId,
+        provider: 'groq',
         variables: {
           readinessScore,
           coveragePercent: coverage.coveragePercent,

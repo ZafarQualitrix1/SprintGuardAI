@@ -48,10 +48,14 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
     const testCaseDescription = testCase.description ?? testCase.title;
 
     if (command.automationType === 'API') {
+      // Explicit: capabilities without a provider fall through to the deployment's
+      // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
+      // before -- pinning to the one with a real, working key avoids depending on that.
       const result = await this.aiOrchestrationService.execute({
         capability: 'playwright-api-automation',
         agentKey: 'playwright-api-automation-agent',
         organizationId: command.organizationId,
+        provider: 'groq',
         variables: {
           storyTitle: testCase.storyTitle,
           testCaseTitle: testCase.title,
@@ -88,10 +92,14 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
       return generation;
     }
 
+    // Explicit: capabilities without a provider fall through to the deployment's
+    // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
+    // before -- pinning to the one with a real, working key avoids depending on that.
     const result = await this.aiOrchestrationService.execute({
       capability: 'playwright-ui-automation',
       agentKey: 'playwright-ui-automation-agent',
       organizationId: command.organizationId,
+      provider: 'groq',
       variables: {
         storyTitle: testCase.storyTitle,
         testCaseTitle: testCase.title,

@@ -89,10 +89,14 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
     let lastPromptVersion = '';
 
     for (const ac of acceptanceCriteria) {
+      // Explicit: capabilities without a provider fall through to the deployment's
+      // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
+      // before -- pinning to the one with a real, working key avoids depending on that.
       const scenarioResult = await this.aiOrchestrationService.execute({
         capability: 'test-scenario',
         agentKey: 'test-scenario-agent',
         organizationId: command.organizationId,
+        provider: 'groq',
         variables: { storyTitle: ac.storyTitle, given: ac.given, when: ac.when, then: ac.then },
         outputSchema: testScenarioOutputSchema,
       });
@@ -108,6 +112,7 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
           capability: 'test-case',
           agentKey: 'test-case-agent',
           organizationId: command.organizationId,
+          provider: 'groq',
           variables: {
             scenarioTitle: scenario.title,
             scenarioDescription: scenario.description ?? 'No additional description.',

@@ -48,10 +48,14 @@ export class ComputeCoverageHandler implements ICommandHandler<ComputeCoverageCo
         })
         .filter((line): line is string => line !== null);
 
+      // Explicit: capabilities without a provider fall through to the deployment's
+      // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
+      // before -- pinning to the one with a real, working key avoids depending on that.
       const result = await this.aiOrchestrationService.execute({
         capability: 'coverage-recommendation',
         agentKey: 'coverage-agent',
         organizationId: command.organizationId,
+        provider: 'groq',
         variables: {
           sprintName: source.sprintName,
           coveragePercent: summary.coveragePercent,
