@@ -7,7 +7,7 @@ import {
 } from '../../domain/repositories/ai-provider-config.repository.interface';
 import { AiAuditLogService } from '../../infrastructure/services/ai-audit-log.service';
 
-const SUPPORTED_PROVIDERS = new Set(['groq', 'openai', 'anthropic']);
+const SUPPORTED_PROVIDERS = new Set(['groq', 'openai', 'anthropic', 'openrouter', 'google']);
 
 export class SetProviderEnabledCommand {
   constructor(
@@ -28,7 +28,7 @@ export class SetProviderEnabledHandler implements ICommandHandler<SetProviderEna
   async execute(command: SetProviderEnabledCommand): Promise<AiProviderConfigRecord> {
     if (!SUPPORTED_PROVIDERS.has(command.provider)) {
       throw new BadRequestException(
-        `"${command.provider}" isn't integrated yet -- only google, openai, and anthropic can be enabled.`,
+        `"${command.provider}" isn't integrated yet -- only ${Array.from(SUPPORTED_PROVIDERS).join(', ')} can be enabled.`,
       );
     }
 

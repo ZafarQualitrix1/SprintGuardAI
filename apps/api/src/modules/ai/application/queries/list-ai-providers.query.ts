@@ -35,6 +35,7 @@ const KNOWN_PROVIDERS: Array<{ provider: string; displayName: string; supported:
   { provider: 'deepseek', displayName: 'DeepSeek', supported: false },
   { provider: 'ollama', displayName: 'Ollama', supported: false },
   { provider: 'openrouter', displayName: 'OpenRouter', supported: true },
+  { provider: 'google', displayName: 'Gemini (Google)', supported: true },
 ];
 
 export class ListAiProvidersQuery {

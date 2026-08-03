@@ -22,6 +22,7 @@ import { ClaudeProviderService } from './infrastructure/providers/claude-provide
 import { OpenAiProviderService } from './infrastructure/providers/openai-provider.service';
 import { GroqProviderService } from './infrastructure/providers/groq-provider.service';
 import { OpenRouterProviderService } from './infrastructure/providers/openrouter-provider.service';
+import { GeminiProviderService } from './infrastructure/providers/gemini-provider.service';
 import { AesCredentialVaultService } from './infrastructure/services/aes-credential-vault.service';
 import { AiAuditLogService } from './infrastructure/services/ai-audit-log.service';
 import {
@@ -51,6 +52,7 @@ import {
     OpenAiProviderService,
     GroqProviderService,
     OpenRouterProviderService,
+    GeminiProviderService,
     ...AI_SETTINGS_COMMAND_HANDLERS,
     ...AI_SETTINGS_QUERY_HANDLERS,
     {
@@ -60,8 +62,15 @@ import {
         openai: OpenAiProviderService,
         groq: GroqProviderService,
         openrouter: OpenRouterProviderService,
-      ) => [claude, openai, groq, openrouter],
-      inject: [ClaudeProviderService, OpenAiProviderService, GroqProviderService, OpenRouterProviderService],
+        gemini: GeminiProviderService,
+      ) => [claude, openai, groq, openrouter, gemini],
+      inject: [
+        ClaudeProviderService,
+        OpenAiProviderService,
+        GroqProviderService,
+        OpenRouterProviderService,
+        GeminiProviderService,
+      ],
     },
     { provide: CREDENTIAL_VAULT, useClass: AesCredentialVaultService },
     { provide: AGENT_REPOSITORY, useClass: PrismaAgentRepository },

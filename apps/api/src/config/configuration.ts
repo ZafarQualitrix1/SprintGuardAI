@@ -43,6 +43,7 @@ export default () => ({
     openAiApiKey: process.env.OPENAI_API_KEY,
     groqApiKey: process.env.GROQ_API_KEY,
     openRouterApiKey: process.env.OPENROUTER_API_KEY,
+    geminiApiKey: process.env.GEMINI_API_KEY,
     defaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'groq',
   },
   observability: {

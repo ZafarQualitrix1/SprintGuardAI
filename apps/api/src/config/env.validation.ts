@@ -40,7 +40,8 @@ export const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional(),
   GROQ_API_KEY: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
-  AI_DEFAULT_PROVIDER: z.enum(['anthropic', 'openai', 'groq', 'openrouter']).default('groq'),
+  GEMINI_API_KEY: z.string().optional(),
+  AI_DEFAULT_PROVIDER: z.enum(['anthropic', 'openai', 'groq', 'openrouter', 'google']).default('groq'),
 
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'verbose']).default('info'),

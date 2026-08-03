@@ -85,6 +85,8 @@ export class TestAiProviderConnectionHandler
         return 'claude-sonnet-5';
       case 'openrouter':
         return 'openai/gpt-4o-mini';
+      case 'google':
+        return 'gemini-2.0-flash';
       default:
         return 'default';
     }
