@@ -46,6 +46,16 @@ export class UpsertAiProviderConfigHandler
 
   async execute(command: UpsertAiProviderConfigCommand): Promise<AiProviderConfigRecord> {
     const { apiKey, ...rest } = command.input;
+    // A blank form field arrives here as '', not null/undefined -- and every consumer of these
+    // columns (test-ai-provider-connection.command.ts, ai-provider-config.service.ts) falls back
+    // to a sensible default via `?? `, which only triggers on null/undefined. Left as '', it
+    // silently wins over the fallback and gets sent to the provider as e.g. `model: ''`.
+    const STRING_FIELDS = ['defaultModel', 'projectId', 'region', 'fallbackProvider', 'fallbackModel'] as const;
+    for (const field of STRING_FIELDS) {
+      if (rest[field] === '') {
+        rest[field] = null;
+      }
+    }
 
     const config = await this.repository.upsert({
       organizationId: command.organizationId,
