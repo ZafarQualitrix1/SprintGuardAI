@@ -1,6 +1,7 @@
-import { BadRequestException, Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { BadRequestException, ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   AUTOMATION_GENERATION_REPOSITORY,
   IAutomationGenerationRepository,
@@ -31,6 +32,7 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
     @Inject(AUTOMATION_GENERATION_REPOSITORY) private readonly automationRepository: IAutomationGenerationRepository,
     private readonly scaffoldService: PlaywrightScaffoldService,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly queryBus: QueryBus,
   ) {}
 
   async execute(command: GenerateAutomationCommand): Promise<AutomationGenerationEntity> {
@@ -38,6 +40,16 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
     if (!testCase) {
       throw new NotFoundException('Test case not found');
     }
+
+    const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
+      new IsStoryLockedQuery(command.organizationId, testCase.storyId),
+    );
+    if (isLocked) {
+      throw new ForbiddenException(
+        'This story is BA-approved and locked. An Admin must unlock it before generating automation.',
+      );
+    }
+
     if (testCase.automationStatus === 'MANUAL') {
       throw new BadRequestException(
         'This test case is not marked automatable. Regenerate it from Test Generation with automation enabled first.',

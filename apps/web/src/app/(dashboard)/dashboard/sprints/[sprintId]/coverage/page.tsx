@@ -13,6 +13,7 @@ import { useSprint } from '@/features/sprint/api';
 import { StoryPicker } from '@/features/sprint/components';
 import { useComputeStoryCoverage, useStoryCoverage } from '@/features/coverage/api';
 import { CoverageDimensionsGrid } from '@/features/coverage/components';
+import { useBaReviewStatus } from '@/features/ba-review/api';
 import { useSelectedStoryStore, useSelectedStoryForSprint } from '@/stores/selected-story-store';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
@@ -36,6 +37,12 @@ export default function CoveragePage() {
   const storyId = sprint?.stories.find((s) => s.id === selectedStoryId)?.id ?? sprint?.stories[0]?.id ?? null;
   const { data: coverage, isLoading: coverageLoading } = useStoryCoverage(storyId);
   const compute = useComputeStoryCoverage(storyId);
+  const { data: baStatus } = useBaReviewStatus(storyId);
+  const isLocked = baStatus?.isLocked ?? false;
+  const computeDisabled = compute.isPending || !storyId || isLocked;
+  const computeDisabledReason = isLocked
+    ? 'Coverage for this story is BA-approved and locked. An Admin must unlock it first.'
+    : undefined;
 
   return (
     <div>
@@ -59,7 +66,8 @@ export default function CoveragePage() {
                   }),
               })
             }
-            disabled={compute.isPending || !storyId}
+            disabled={computeDisabled}
+            title={computeDisabledReason}
           >
             <Sparkles className="mr-2 h-4 w-4" />
             {compute.isPending ? 'Computing…' : 'Compute coverage'}

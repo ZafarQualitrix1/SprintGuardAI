@@ -1,6 +1,7 @@
-import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
+import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   COVERAGE_SOURCE_READ_REPOSITORY,
   ICoverageSourceReadRepository,
@@ -25,9 +26,19 @@ export class ComputeStoryCoverageHandler
     @Inject(COVERAGE_SOURCE_READ_REPOSITORY) private readonly sourceReadRepository: ICoverageSourceReadRepository,
     @Inject(COVERAGE_REPOSITORY) private readonly coverageRepository: ICoverageRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly queryBus: QueryBus,
   ) {}
 
   async execute(command: ComputeStoryCoverageCommand): Promise<StoryCoverageResultEntity> {
+    const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
+      new IsStoryLockedQuery(command.organizationId, command.storyId),
+    );
+    if (isLocked) {
+      throw new ForbiddenException(
+        'Coverage for this story is BA-approved and locked. An Admin must unlock it before recomputing.',
+      );
+    }
+
     const source = await this.sourceReadRepository.getStoryCoverageSource(command.storyId, command.organizationId);
     if (!source) {
       throw new NotFoundException('Story not found');

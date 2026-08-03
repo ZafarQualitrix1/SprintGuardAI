@@ -9,6 +9,7 @@ import { ApiError } from '@/lib/api-client';
 import { automationApi } from '@/features/automation/api';
 import { useGenerateAutomation, useSaveAutomation } from '@/features/automation/api';
 import { downloadFilesAsZip, slugify } from '@/features/automation/lib/download-framework';
+import { useBaReviewStatus } from '@/features/ba-review/api';
 import type { AutomationCandidate } from '@sprintguard/shared';
 
 const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'destructive'> = {
@@ -41,6 +42,10 @@ export function AutomationCandidateRow({
 }: AutomationCandidateRowProps) {
   const generate = useGenerateAutomation(sprintId);
   const save = useSaveAutomation(sprintId);
+  // React Query dedupes this across every row sharing the same storyId, so this doesn't fan out
+  // into one request per row -- same pattern as story-test-generator-card.tsx.
+  const { data: baStatus } = useBaReviewStatus(candidate.storyId);
+  const isLocked = baStatus?.isLocked ?? false;
 
   const relevantGeneration = candidate.automationType === 'API' ? candidate.latestApi : candidate.latestUi;
 
@@ -112,7 +117,13 @@ export function AutomationCandidateRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
-        <Button size="sm" variant="outline" disabled={generate.isPending} onClick={onGenerate}>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={generate.isPending || isLocked}
+          title={isLocked ? 'This story is BA-approved and locked. An Admin must unlock it first.' : undefined}
+          onClick={onGenerate}
+        >
           {relevantGeneration ? (
             <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
           ) : (

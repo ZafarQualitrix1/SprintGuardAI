@@ -7,8 +7,12 @@ const statusKey = (storyId: string) => ['ba-review', 'status', storyId];
 const timelineKey = (storyId: string) => ['ba-review', 'timeline', storyId];
 const syncLogsKey = (storyId: string) => ['ba-review', 'sync-logs', storyId];
 
-export function useBaReviewStatus(storyId: string) {
-  return useQuery({ queryKey: statusKey(storyId), queryFn: () => baReviewApi.getStatus(storyId) });
+export function useBaReviewStatus(storyId: string | null) {
+  return useQuery({
+    queryKey: statusKey(storyId ?? ''),
+    queryFn: () => baReviewApi.getStatus(storyId as string),
+    enabled: Boolean(storyId),
+  });
 }
 
 export function useReviewTimeline(storyId: string) {
