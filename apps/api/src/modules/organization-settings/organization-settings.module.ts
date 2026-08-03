@@ -10,7 +10,6 @@ import {
 } from './domain/repositories';
 import { AesCredentialVaultService } from './infrastructure/services/aes-credential-vault.service';
 import { OrgSettingsAuditLogService } from './infrastructure/services/org-settings-audit-log.service';
-import { SupabaseStorageService } from './infrastructure/services/supabase-storage.service';
 import {
   PrismaOrganizationSettingsRepository,
   PrismaInvitationRepository,
@@ -19,16 +18,16 @@ import {
 
 // Bounded context module: Organization Settings. Owns the org-wide configuration singleton
 // (OrganizationSettings), team management (Invitation + Membership read/write), and organization
-// branding (TenantBranding.logoUrl via Supabase Storage). Provider/model AI defaults and budgets
-// stay owned by the `ai` module (AiProviderConfig/UsageQuota) -- this module only stores the
-// org-wide AI toggles that don't belong to a specific provider.
+// branding (TenantBranding.logoUrl, stored inline as a data: URL -- see
+// upload-organization-logo.command.ts). Provider/model AI defaults and budgets stay owned by the
+// `ai` module (AiProviderConfig/UsageQuota) -- this module only stores the org-wide AI toggles
+// that don't belong to a specific provider.
 @Module({
   controllers: [OrganizationSettingsController],
   providers: [
     ...ORGANIZATION_SETTINGS_COMMAND_HANDLERS,
     ...ORGANIZATION_SETTINGS_QUERY_HANDLERS,
     OrgSettingsAuditLogService,
-    SupabaseStorageService,
     { provide: CREDENTIAL_VAULT, useClass: AesCredentialVaultService },
     { provide: ORGANIZATION_SETTINGS_REPOSITORY, useClass: PrismaOrganizationSettingsRepository },
     { provide: INVITATION_REPOSITORY, useClass: PrismaInvitationRepository },

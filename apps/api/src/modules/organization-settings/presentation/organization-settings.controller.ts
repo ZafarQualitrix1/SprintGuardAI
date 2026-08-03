@@ -12,8 +12,7 @@ import { ListInvitationsQuery } from '../application/queries/list-invitations.qu
 import { ListOrganizationMembersQuery } from '../application/queries/list-organization-members.query';
 import { GetOrganizationBrandingQuery, OrganizationBranding } from '../application/queries/get-organization-branding.query';
 import { UpsertOrganizationSettingsCommand } from '../application/commands/upsert-organization-settings.command';
-import { GenerateLogoUploadUrlCommand, GenerateLogoUploadUrlResult } from '../application/commands/generate-logo-upload-url.command';
-import { ConfirmLogoUploadCommand } from '../application/commands/confirm-logo-upload.command';
+import { UploadOrganizationLogoCommand } from '../application/commands/upload-organization-logo.command';
 import { ImportOrganizationSettingsCommand } from '../application/commands/import-organization-settings.command';
 import { SendTestNotificationCommand, SendTestNotificationResult } from '../application/commands/send-test-notification.command';
 import { InviteMemberCommand, InviteMemberResult } from '../application/commands/invite-member.command';
@@ -25,8 +24,7 @@ import { InvitationRecord } from '../domain/repositories/invitation.repository.i
 import { OrganizationMemberRecord } from '../domain/repositories/organization-member.repository.interface';
 import {
   ChangeMemberRoleDto,
-  ConfirmLogoUploadDto,
-  GenerateLogoUploadUrlDto,
+  UploadOrganizationLogoDto,
   ImportOrganizationSettingsDto,
   InviteMemberDto,
   UpsertOrganizationSettingsDto,
@@ -82,26 +80,16 @@ export class OrganizationSettingsController {
     return this.commandBus.execute(new ImportOrganizationSettingsCommand(user.organizationId, user.userId, dto));
   }
 
-  @Post('logo/upload-url')
+  @Post('logo')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('org:manage')
-  async generateLogoUploadUrl(
-    @Body() dto: GenerateLogoUploadUrlDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ): Promise<GenerateLogoUploadUrlResult> {
-    return this.commandBus.execute(
-      new GenerateLogoUploadUrlCommand(user.organizationId, dto.contentType, dto.sizeBytes, dto.extension),
-    );
-  }
-
-  @Post('logo/confirm')
-  @HttpCode(HttpStatus.OK)
-  @RequirePermission('org:manage')
-  async confirmLogoUpload(
-    @Body() dto: ConfirmLogoUploadDto,
+  async uploadLogo(
+    @Body() dto: UploadOrganizationLogoDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ logoUrl: string }> {
-    return this.commandBus.execute(new ConfirmLogoUploadCommand(user.organizationId, user.userId, dto.path));
+    return this.commandBus.execute(
+      new UploadOrganizationLogoCommand(user.organizationId, user.userId, dto.contentType, dto.data),
+    );
   }
 
   @Post('notifications/test/:channel')

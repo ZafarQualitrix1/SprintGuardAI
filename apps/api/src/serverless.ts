@@ -12,7 +12,7 @@ let cachedHandler: Express | null = null;
 async function getHandler(): Promise<Express> {
   if (!cachedHandler) {
     const expressApp = express();
-    const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
+    const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp), { bodyParser: false });
     await configureApp(app);
     await app.init();
     cachedHandler = expressApp;

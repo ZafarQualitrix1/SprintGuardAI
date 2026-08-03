@@ -8,6 +8,7 @@ import { configureApp } from './bootstrap';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(winstonLoggerOptions),
+    bodyParser: false,
   });
 
   await configureApp(app);

@@ -1,5 +1,6 @@
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -8,6 +9,11 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 // Shared between the local dev entrypoint (main.ts) and the Vercel serverless entrypoint
 // (api/index.ts) so both processes configure the Nest app identically.
 export async function configureApp(app: INestApplication): Promise<void> {
+  // Both entrypoints create the app with bodyParser disabled so the 5mb limit here (default is
+  // 100kb) applies everywhere -- needed for organization logo uploads, sent as base64 JSON
+  // (2MB file -> ~2.8MB of base64 text).
+  app.use(json({ limit: '5mb' }));
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({

@@ -159,10 +159,8 @@ export interface OrganizationBranding {
   primaryColor: string | null;
 }
 
-export interface GenerateLogoUploadUrlResult {
-  path: string;
-  signedUrl: string;
-  token: string;
+export interface UploadOrganizationLogoResult {
+  logoUrl: string;
 }
 
 export interface SendTestNotificationResult {

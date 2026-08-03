@@ -41,23 +41,28 @@ export function useSendTestNotification() {
   return useMutation({ mutationFn: (channel: 'slack' | 'teams') => organizationApi.sendTestNotification(channel) });
 }
 
-// Two-step signed-upload-URL flow: get a signed URL, PUT the file to storage directly, then
-// confirm so the backend writes TenantBranding.logoUrl.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      // reader.result is a "data:<mime>;base64,<data>" URL -- the backend stores it as-is with
+      // its own contentType field, so only the part after the comma is sent.
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Logos are stored inline (TenantBranding.logoUrl as a data: URL) rather than in external object
+// storage, so upload is a single request: base64-encode the file, POST it, done.
 export function useUploadLogo() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      const extension = file.name.split('.').pop() ?? 'png';
-      const { path, signedUrl } = await organizationApi.generateLogoUploadUrl(file.type, file.size, extension);
-      const uploadResponse = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': file.type },
-        body: file,
-      });
-      if (!uploadResponse.ok) {
-        throw new Error('Upload to storage failed');
-      }
-      return organizationApi.confirmLogoUpload(path);
+      const data = await fileToBase64(file);
+      return organizationApi.uploadLogo(file.type, data);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: BRANDING_KEY }),
   });

@@ -1,5 +1,5 @@
 import type {
-  GenerateLogoUploadUrlResult,
+  UploadOrganizationLogoResult,
   Invitation,
   InviteMemberInput,
   InviteMemberResult,
@@ -22,14 +22,8 @@ export const organizationApi = {
   import: (backup: OrganizationSettingsBackup) =>
     apiClient.post<OrganizationSettings>('/organization-settings/import', backup),
 
-  generateLogoUploadUrl: (contentType: string, sizeBytes: number, extension: string) =>
-    apiClient.post<GenerateLogoUploadUrlResult>('/organization-settings/logo/upload-url', {
-      contentType,
-      sizeBytes,
-      extension,
-    }),
-  confirmLogoUpload: (path: string) =>
-    apiClient.post<{ logoUrl: string }>('/organization-settings/logo/confirm', { path }),
+  uploadLogo: (contentType: string, data: string) =>
+    apiClient.post<UploadOrganizationLogoResult>('/organization-settings/logo', { contentType, data }),
 
   sendTestNotification: (channel: 'slack' | 'teams') =>
     apiClient.post<SendTestNotificationResult>(`/organization-settings/notifications/test/${channel}`),
