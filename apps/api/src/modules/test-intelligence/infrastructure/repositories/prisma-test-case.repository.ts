@@ -38,7 +38,9 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
         created.push(row);
       }
       return created;
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- see prisma-requirement.repository.ts
+    // for why sequential per-row creates need explicit headroom.
+    }, { timeout: 15000 });
 
     return rows.map(toTestCaseEntity);
   }
@@ -103,7 +105,9 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
         });
         affectedScenarioIds.add(testCase.testScenarioId);
       }
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- see prisma-requirement.repository.ts
+    // for why sequential per-row writes need explicit headroom.
+    }, { timeout: 15000 });
 
     if (affectedScenarioIds.size === 0) {
       return [];

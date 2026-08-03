@@ -34,7 +34,9 @@ export class PrismaTestScenarioRepository implements ITestScenarioRepository {
         created.push(row);
       }
       return created;
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- see prisma-requirement.repository.ts
+    // for why sequential per-row creates need explicit headroom.
+    }, { timeout: 15000 });
 
     return rows.map(toTestScenarioEntity);
   }

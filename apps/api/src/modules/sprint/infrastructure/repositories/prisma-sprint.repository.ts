@@ -139,7 +139,10 @@ export class PrismaSprintRepository implements ISprintRepository {
       await resolveSubtaskParents(tx, sprint.id, input.stories);
 
       return { sprint, stories, storiesCreated, storiesUpdated, wasNewSprint: !existingSprint };
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- a Jira sprint with even a
+    // couple dozen stories does 1-2 sequential round trips per story here, easily exceeding that
+    // (see prisma-requirement.repository.ts for where this same class of bug first surfaced).
+    }, { timeout: 30000 });
 
     return {
       sprintWithStories: new SprintWithStories(toSprintEntity(result.sprint), result.stories.map(toStoryEntity)),
@@ -178,7 +181,9 @@ export class PrismaSprintRepository implements ISprintRepository {
       await resolveSubtaskParents(tx, sprint.id, input.stories);
 
       return { sprint, stories };
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- see the sibling
+    // upsertWithStories above for why sprint-sized story loops need real headroom.
+    }, { timeout: 30000 });
 
     return {
       sprintWithStories: new SprintWithStories(toSprintEntity(result.sprint), result.stories.map(toStoryEntity)),

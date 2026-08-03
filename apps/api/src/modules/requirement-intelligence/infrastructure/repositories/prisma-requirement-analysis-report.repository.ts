@@ -45,7 +45,7 @@ export class PrismaRequirementAnalysisReportRepository implements IRequirementAn
           jiraSnapshot: input.jiraSnapshot as Prisma.InputJsonValue,
         },
       });
-    });
+    }, { timeout: 15000 });
 
     return toRequirementAnalysisReportEntity(row);
   }

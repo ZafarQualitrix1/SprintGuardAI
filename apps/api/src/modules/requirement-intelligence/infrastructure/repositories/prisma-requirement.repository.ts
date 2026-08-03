@@ -38,7 +38,10 @@ export class PrismaRequirementRepository implements IRequirementRepository {
         created.push(row);
       }
       return created;
-    });
+    // Prisma's default interactive-transaction timeout is 5000ms -- sequential per-row creates
+    // over network latency to the DB can exceed that even for a handful of requirements (observed
+    // in production at 5168ms for ~1 requirement), so this needs real headroom.
+    }, { timeout: 15000 });
 
     return rows.map(toRequirementEntity);
   }
