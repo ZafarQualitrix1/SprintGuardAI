@@ -42,7 +42,7 @@ export default () => ({
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     openAiApiKey: process.env.OPENAI_API_KEY,
     groqApiKey: process.env.GROQ_API_KEY,
-    defaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'anthropic',
+    defaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'groq',
   },
   observability: {
     otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
