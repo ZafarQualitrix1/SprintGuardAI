@@ -8,8 +8,8 @@ export class GenerateLogoUploadUrlDto {
 
   @ApiProperty()
   @IsInt()
-  @Min(1)
-  @Max(2 * 1024 * 1024)
+  @Min(1, { message: 'File is empty.' })
+  @Max(2 * 1024 * 1024, { message: 'File is too large. Logos must be 2MB or smaller.' })
   sizeBytes!: number;
 
   @ApiProperty({ example: 'png' })

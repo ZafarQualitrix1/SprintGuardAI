@@ -77,9 +77,22 @@ export function ProfilePanel() {
     });
   });
 
+  const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+
+    if (file.size > MAX_LOGO_BYTES) {
+      toast({
+        variant: 'destructive',
+        title: 'Logo is too large',
+        description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Logos must be 2MB or smaller.`,
+      });
+      return;
+    }
+
     uploadLogo.mutate(file, {
       onSuccess: () => toast({ title: 'Logo updated' }),
       onError: (error) =>
