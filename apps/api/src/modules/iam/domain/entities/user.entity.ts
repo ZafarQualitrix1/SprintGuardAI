@@ -7,9 +7,10 @@ export class UserEntity {
     public readonly fullName: string,
     public readonly passwordHash: string | null,
     public readonly isActive: boolean,
+    public readonly avatarUrl: string | null = null,
   ) {}
 
   static create(params: { id: string; email: string; fullName: string; passwordHash: string }): UserEntity {
-    return new UserEntity(params.id, params.email, params.fullName, params.passwordHash, true);
+    return new UserEntity(params.id, params.email, params.fullName, params.passwordHash, true, null);
   }
 }

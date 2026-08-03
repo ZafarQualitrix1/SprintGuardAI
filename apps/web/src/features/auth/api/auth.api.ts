@@ -23,4 +23,6 @@ export const authApi = {
     apiClient.post<{ message: string }>('/auth/forgot-password', input),
   resetPassword: (input: ResetPasswordInput) => apiClient.post<AuthResponse>('/auth/reset-password', input),
   googleSignIn: (input: GoogleSignInInput) => apiClient.post<AuthResponse>('/auth/google', input),
+  uploadAvatar: (contentType: string, data: string) =>
+    apiClient.post<{ avatarUrl: string }>('/auth/me/avatar', { contentType, data }),
 };

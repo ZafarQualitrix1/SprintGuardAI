@@ -5,6 +5,7 @@ const user = {
   id: 'user-1',
   email: 'jane@acme.com',
   fullName: 'Jane Doe',
+  avatarUrl: null,
   organizationId: 'org-1',
   organizationName: 'Acme Corp',
   roleKey: 'OWNER',

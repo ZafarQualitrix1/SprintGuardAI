@@ -6,6 +6,7 @@ export interface AuthenticatedUserView {
   id: string;
   email: string;
   fullName: string;
+  avatarUrl: string | null;
   organizationId: string;
   organizationName: string;
   roleKey: string;

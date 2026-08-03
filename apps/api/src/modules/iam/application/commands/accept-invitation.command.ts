@@ -80,6 +80,7 @@ export class AcceptInvitationHandler implements ICommandHandler<AcceptInvitation
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
         organizationId: invitation.organizationId,
         organizationName: membership.organization.name,
         roleKey: membership.role.key,

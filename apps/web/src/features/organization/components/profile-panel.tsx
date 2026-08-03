@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api-client';
+import { validateImageFile } from '@/lib/file-upload';
 import { useAuthStore } from '@/stores/auth-store';
 import {
   useOrganizationBranding,
@@ -77,19 +78,18 @@ export function ProfilePanel() {
     });
   });
 
-  const MAX_LOGO_BYTES = 2 * 1024 * 1024;
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
 
-    if (file.size > MAX_LOGO_BYTES) {
-      toast({
-        variant: 'destructive',
-        title: 'Logo is too large',
-        description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(1)}MB. Logos must be 2MB or smaller.`,
-      });
+    const validationError = validateImageFile(file, {
+      maxBytes: 2 * 1024 * 1024,
+      allowedTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'],
+      label: 'Logos',
+    });
+    if (validationError) {
+      toast({ variant: 'destructive', ...validationError });
       return;
     }
 

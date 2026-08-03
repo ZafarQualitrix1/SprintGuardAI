@@ -73,6 +73,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, AuthSessionRe
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
         organizationId: membership.organizationId,
         organizationName: membership.organizationName,
         roleKey: membership.roleKey,

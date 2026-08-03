@@ -5,6 +5,7 @@ import type { AuthResponse } from '@sprintguard/shared';
 import { authApi } from './auth.api';
 import { useAuthStore } from '@/stores/auth-store';
 import { ApiError } from '@/lib/api-client';
+import { fileToBase64 } from '@/lib/file-upload';
 
 function applySession(session: AuthResponse) {
   useAuthStore.getState().setSession(session.accessToken, session.user);
@@ -46,6 +47,16 @@ export function useGoogleSignIn() {
   return useMutation({
     mutationFn: authApi.googleSignIn,
     onSuccess: applySession,
+  });
+}
+
+export function useUploadAvatar() {
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const data = await fileToBase64(file);
+      return authApi.uploadAvatar(file.type, data);
+    },
+    onSuccess: ({ avatarUrl }) => useAuthStore.getState().updateUser({ avatarUrl }),
   });
 }
 

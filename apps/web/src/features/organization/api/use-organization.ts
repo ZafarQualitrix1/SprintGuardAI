@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InviteMemberInput, OrganizationSettingsBackup, UpsertOrganizationSettingsInput } from '@sprintguard/shared';
+import { fileToBase64 } from '@/lib/file-upload';
 import { organizationApi } from './organization.api';
 
 const SETTINGS_KEY = ['organization', 'settings'];
@@ -39,20 +40,6 @@ export function useImportOrganizationSettings() {
 
 export function useSendTestNotification() {
   return useMutation({ mutationFn: (channel: 'slack' | 'teams') => organizationApi.sendTestNotification(channel) });
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      // reader.result is a "data:<mime>;base64,<data>" URL -- the backend stores it as-is with
-      // its own contentType field, so only the part after the comma is sent.
-      const result = reader.result as string;
-      resolve(result.slice(result.indexOf(',') + 1));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read file'));
-    reader.readAsDataURL(file);
-  });
 }
 
 // Logos are stored inline (TenantBranding.logoUrl as a data: URL) rather than in external object

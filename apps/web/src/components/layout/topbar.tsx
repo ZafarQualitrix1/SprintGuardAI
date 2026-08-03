@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { LogOut, Settings, User } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +17,7 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { useLogout } from '@/features/auth/api';
 import { toast } from '@/hooks/use-toast';
+import { formatRoleKey } from '@/lib/format';
 
 export function Topbar() {
   const router = useRouter();
@@ -40,11 +42,18 @@ export function Topbar() {
           <span className="text-sm font-medium text-muted-foreground">{user.organizationName}</span>
         ) : null}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <ThemeToggle />
         <DropdownMenu>
-          <DropdownMenuTrigger className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <DropdownMenuTrigger className="flex items-center gap-2 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {user ? (
+              <span className="hidden text-right leading-tight sm:block">
+                <span className="block text-sm font-medium">{user.fullName}</span>
+                <span className="block text-xs text-muted-foreground">{formatRoleKey(user.roleKey)}</span>
+              </span>
+            ) : null}
             <Avatar>
+              {user?.avatarUrl ? <AvatarImage src={user.avatarUrl} alt={user.fullName} /> : null}
               <AvatarFallback>{initial}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
@@ -52,6 +61,11 @@ export function Topbar() {
             <DropdownMenuLabel>
               <p className="truncate text-sm font-medium">{user?.fullName}</p>
               <p className="truncate text-xs font-normal text-muted-foreground">{user?.email}</p>
+              {user ? (
+                <Badge variant="secondary" className="mt-1.5">
+                  {formatRoleKey(user.roleKey)}
+                </Badge>
+              ) : null}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

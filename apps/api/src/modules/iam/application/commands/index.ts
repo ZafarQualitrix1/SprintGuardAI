@@ -13,6 +13,7 @@ export * from './update-user.command';
 export * from './forgot-password.command';
 export * from './reset-password.command';
 export * from './google-sign-in.command';
+export * from './upload-user-avatar.command';
 
 import { RegisterOrganizationHandler } from './register-organization.command';
 import { LoginHandler } from './login.command';
@@ -27,6 +28,7 @@ import { UpdateUserHandler } from './update-user.command';
 import { ForgotPasswordHandler } from './forgot-password.command';
 import { ResetPasswordHandler } from './reset-password.command';
 import { GoogleSignInHandler } from './google-sign-in.command';
+import { UploadUserAvatarHandler } from './upload-user-avatar.command';
 
 export const IAM_COMMAND_HANDLERS = [
   RegisterOrganizationHandler,
@@ -42,4 +44,5 @@ export const IAM_COMMAND_HANDLERS = [
   ForgotPasswordHandler,
   ResetPasswordHandler,
   GoogleSignInHandler,
+  UploadUserAvatarHandler,
 ];

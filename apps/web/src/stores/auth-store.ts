@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
   id: string;
   email: string;
   fullName: string;
+  avatarUrl: string | null;
   organizationId: string;
   organizationName: string;
   roleKey: string;
@@ -16,6 +17,7 @@ interface AuthState {
   user: AuthenticatedUser | null;
   hasHydrated: boolean;
   setSession: (accessToken: string, user: AuthenticatedUser) => void;
+  updateUser: (patch: Partial<AuthenticatedUser>) => void;
   clearSession: () => void;
   setHasHydrated: (value: boolean) => void;
 }
@@ -38,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       hasHydrated: false,
       setSession: (accessToken, user) => set({ accessToken, user }),
+      updateUser: (patch) => set((state) => (state.user ? { user: { ...state.user, ...patch } } : state)),
       clearSession: () => set({ accessToken: null, user: null }),
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),

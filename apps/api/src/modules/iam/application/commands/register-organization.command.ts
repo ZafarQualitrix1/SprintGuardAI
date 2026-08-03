@@ -67,6 +67,7 @@ export class RegisterOrganizationHandler
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
         organizationId,
         organizationName: membership.organizationName,
         roleKey: membership.roleKey,

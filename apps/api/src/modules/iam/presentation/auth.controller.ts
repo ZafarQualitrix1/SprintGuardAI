@@ -16,6 +16,7 @@ import type { Request, Response } from 'express';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { RegisterOrganizationCommand } from '../application/commands/register-organization.command';
+import { UploadUserAvatarCommand } from '../application/commands/upload-user-avatar.command';
 import { LoginCommand } from '../application/commands/login.command';
 import { RefreshSessionCommand } from '../application/commands/refresh-session.command';
 import { LogoutCommand } from '../application/commands/logout.command';
@@ -32,6 +33,7 @@ import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { GoogleSignInDto } from './dto/google-sign-in.dto';
+import { UploadAvatarDto } from './dto/upload-avatar.dto';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 // Scoped to the refresh endpoint only -- the browser never attaches this cookie to any other
@@ -171,5 +173,16 @@ export class AuthController {
   @Get('me')
   async me(@CurrentUser() user: AuthenticatedUser) {
     return this.queryBus.execute(new GetCurrentUserQuery(user.userId, user.organizationId));
+  }
+
+  @Post('me/avatar')
+  @HttpCode(HttpStatus.OK)
+  async uploadAvatar(
+    @Body() dto: UploadAvatarDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ avatarUrl: string }> {
+    return this.commandBus.execute(
+      new UploadUserAvatarCommand(user.organizationId, user.userId, dto.contentType, dto.data),
+    );
   }
 }

@@ -8,7 +8,7 @@ type MembershipWithRelations = Membership & {
 };
 
 export function toUserEntity(user: User): UserEntity {
-  return new UserEntity(user.id, user.email, user.fullName, user.passwordHash, user.isActive);
+  return new UserEntity(user.id, user.email, user.fullName, user.passwordHash, user.isActive, user.avatarUrl);
 }
 
 export function toMembershipEntity(membership: MembershipWithRelations): MembershipEntity {

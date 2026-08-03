@@ -1,9 +1,10 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AuthUserDto {
   @ApiProperty() id!: string;
   @ApiProperty() email!: string;
   @ApiProperty() fullName!: string;
+  @ApiPropertyOptional({ nullable: true }) avatarUrl!: string | null;
   @ApiProperty() organizationId!: string;
   @ApiProperty() organizationName!: string;
   @ApiProperty() roleKey!: string;

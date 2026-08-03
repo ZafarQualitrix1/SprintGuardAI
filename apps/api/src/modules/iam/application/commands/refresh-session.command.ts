@@ -63,6 +63,7 @@ export class RefreshSessionHandler implements ICommandHandler<RefreshSessionComm
         id: userResult.user.id,
         email: userResult.user.email,
         fullName: userResult.user.fullName,
+        avatarUrl: userResult.user.avatarUrl,
         organizationId: membership.organizationId,
         organizationName: membership.organizationName,
         roleKey: membership.roleKey,
