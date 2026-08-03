@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AlertCircle, FileQuestion, FileSearch } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, FileQuestion, FileSearch, ShieldCheck } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { EmptyState } from '@/components/layout/empty-state';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -72,6 +73,14 @@ export default function AiTestGeneratorPage() {
               <FileSearch className="mr-2 h-4 w-4" />
               View Full Story
             </Button>
+            {selectedStory ? (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/sprints/${params.sprintId}/stories/${selectedStory.id}` as never}>
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  BA Review
+                </Link>
+              </Button>
+            ) : null}
           </div>
           {selectedStory ? <StoryTestGeneratorCard story={selectedStory} /> : null}
           <ViewFullStoryDrawer

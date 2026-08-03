@@ -22,17 +22,18 @@ interface RequestOptions extends Omit<RequestInit, 'body'> {
 // retrying those against a refresh cookie can't fix a wrong password and would just add latency.
 const SKIP_REFRESH_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
 
-async function rawRequest<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
+// Shared by every raw request variant below: attaches auth, sends credentials, and normalizes a
+// non-OK response into ApiError. Callers each handle their own success-body parsing (json/blob)
+// since that varies by variant.
+async function rawFetch(path: string, init: RequestInit): Promise<Response> {
   const { accessToken } = useAuthStore.getState();
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
+    ...init,
     headers: {
-      'Content-Type': 'application/json',
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      ...options.headers,
+      ...init.headers,
     },
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     credentials: 'include',
   });
 
@@ -44,11 +45,47 @@ async function rawRequest<TResponse>(path: string, options: RequestOptions = {})
     throw new ApiError(response.status, message);
   }
 
+  return response;
+}
+
+async function rawRequest<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
+  const response = await rawFetch(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+
   if (response.status === 204) {
     return undefined as TResponse;
   }
 
   return (await response.json()) as TResponse;
+}
+
+// FormData's own boundary-including Content-Type must be set by the browser, not us -- explicitly
+// omitting the header (rather than defaulting to JSON like rawRequest) is the whole point of this
+// variant. Used for multipart uploads (e.g. the Submit for Review attachment).
+async function rawRequestForm<TResponse>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestOptions, 'body'> = {},
+): Promise<TResponse> {
+  const response = await rawFetch(path, { ...options, method: options.method ?? 'POST', body: formData });
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+  return (await response.json()) as TResponse;
+}
+
+// For binary downloads (e.g. test-case export) -- same auth/error handling as rawRequest, but
+// resolves a Blob instead of parsing JSON on success.
+async function rawRequestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+  const response = await rawFetch(path, {
+    ...options,
+    headers: options.body !== undefined ? { 'Content-Type': 'application/json', ...options.headers } : options.headers,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  return response.blob();
 }
 
 // The access token is short-lived by design (apps/api JWT_ACCESS_TTL); the httpOnly refresh cookie
@@ -75,23 +112,27 @@ function refreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-// Single fetch wrapper every TanStack Query hook goes through (features/*/api/*.ts). Attaches the
-// JWT from the Zustand auth store, normalizes error responses into the shared ApiErrorResponse
-// shape emitted by apps/api's AllExceptionsFilter, and transparently renews an expired access token
-// once via the refresh cookie before giving up -- this is what lets a session outlive a single
-// short-lived access token instead of forcing a full re-login every time it expires.
-async function request<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
+// Shared by every apiClient method (JSON, form-upload, blob-download). Attaches the JWT from the
+// Zustand auth store (inside the raw* functions above), normalizes error responses into the shared
+// ApiErrorResponse shape emitted by apps/api's AllExceptionsFilter, and transparently renews an
+// expired access token once via the refresh cookie before giving up -- this is what lets a session
+// outlive a single short-lived access token instead of forcing a full re-login every time it expires.
+async function withAuthRetry<TResponse>(path: string, attempt: () => Promise<TResponse>): Promise<TResponse> {
   try {
-    return await rawRequest<TResponse>(path, options);
+    return await attempt();
   } catch (error) {
     if (error instanceof ApiError && error.statusCode === 401 && !SKIP_REFRESH_PATHS.includes(path)) {
       const refreshed = await refreshSession();
       if (refreshed) {
-        return rawRequest<TResponse>(path, options);
+        return attempt();
       }
     }
     throw error;
   }
+}
+
+function request<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
+  return withAuthRetry(path, () => rawRequest<TResponse>(path, options));
 }
 
 export const apiClient = {
@@ -104,4 +145,10 @@ export const apiClient = {
     request<T>(path, { ...options, method: 'PUT', body }),
   delete: <T>(path: string, options?: RequestOptions) =>
     request<T>(path, { ...options, method: 'DELETE' }),
+  // Multipart upload (e.g. a Submit for Review attachment) -- FormData must not be JSON-stringified
+  // and must not have Content-Type set manually (the browser adds the multipart boundary itself).
+  postForm: <T>(path: string, formData: FormData) =>
+    withAuthRetry(path, () => rawRequestForm<T>(path, formData)),
+  // Binary download (e.g. Excel/CSV/PDF test-case export) -- resolves a Blob instead of parsing JSON.
+  getBlob: (path: string) => withAuthRetry(path, () => rawRequestBlob(path, { method: 'GET' })),
 };
