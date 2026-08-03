@@ -1,4 +1,13 @@
-import type { AcceptInvitationInput, AuthResponse, AuthUser, LoginInput, RegisterInput } from '@sprintguard/shared';
+import type {
+  AcceptInvitationInput,
+  AuthResponse,
+  AuthUser,
+  ForgotPasswordInput,
+  GoogleSignInInput,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from '@sprintguard/shared';
 import { apiClient } from '@/lib/api-client';
 
 // Thin wrappers over apiClient, one per backend endpoint (apps/api/src/modules/iam/presentation/auth.controller.ts).
@@ -10,4 +19,8 @@ export const authApi = {
   me: () => apiClient.get<AuthUser>('/auth/me'),
   acceptInvitation: (input: AcceptInvitationInput) =>
     apiClient.post<AuthResponse>('/auth/accept-invitation', input),
+  forgotPassword: (input: ForgotPasswordInput) =>
+    apiClient.post<{ message: string }>('/auth/forgot-password', input),
+  resetPassword: (input: ResetPasswordInput) => apiClient.post<AuthResponse>('/auth/reset-password', input),
+  googleSignIn: (input: GoogleSignInInput) => apiClient.post<AuthResponse>('/auth/google', input),
 };

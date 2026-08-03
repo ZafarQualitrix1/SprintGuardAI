@@ -64,13 +64,30 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  memberships     Membership[]
-  refreshTokens   RefreshToken[]
-  promptApprovals PromptApproval[]
-  auditLogs       AuditLog[]          @relation("AuditActor")
-  notifications   NotificationEvent[]
+  memberships        Membership[]
+  refreshTokens      RefreshToken[]
+  promptApprovals    PromptApproval[]
+  auditLogs          AuditLog[]          @relation("AuditActor")
+  notifications      NotificationEvent[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
+}
+
+// Self-service "forgot password" flow. Mirrors Invitation's tokenHash pattern (only the hash is
+// persisted; the raw token is emailed once and never stored). Short-lived (1h) relative to
+// Invitation's 7 days since this guards an existing account, not an onboarding link.
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Role {
@@ -301,6 +318,9 @@ model Story {
   assignedBaEmail             String? // Business Analyst assigned to review this story's AI-generated test cases
   assignedBaJiraAccountId     String? // resolved & cached Jira accountId for @mentions, cleared when assignedBaEmail changes
   assignedBaAccountResolvedAt DateTime?
+  // Atomically incremented inside PrismaTestCaseRepository's replaceForScenario transaction to
+  // mint each new TestCase's human-readable displayId ("{externalId ?? storyId}-TC-{n}").
+  testCaseSequenceCounter     Int          @default(0)
   createdAt                   DateTime     @default(now())
   updatedAt                   DateTime     @updatedAt
 
@@ -495,6 +515,19 @@ model TestCase {
   generatedByAgentRunId String?
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
+  // Enterprise Test Generation fields (Solution Architecture BA Review Workflow enhancement).
+  // displayId assigned once via Story.testCaseSequenceCounter (see Story model) so it stays stable
+  // across regenerations/BA-review versions -- a Jira-attached V1 workbook and the live in-app
+  // table must refer to the same test case by the same ID.
+  displayId             String?          @unique // e.g. "PROJ-123-TC-7"
+  testObjective         String?
+  preconditions         Json? // string[]
+  dependencies          String?
+  requestMethod         String? // GET/POST/PUT/PATCH/DELETE, relevant when testType=API
+  requestPayload        Json?
+  expectedStatusCode    Int?
+  expectedResponse      String?
+  remarks               String?
 
   testScenario          TestScenario           @relation(fields: [testScenarioId], references: [id], onDelete: Cascade)
   executions            Execution[]

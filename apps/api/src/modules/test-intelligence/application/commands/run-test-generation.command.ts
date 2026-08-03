@@ -120,7 +120,7 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
           outputSchema: testCaseOutputSchema,
         });
 
-        await this.testCaseRepository.replaceForScenario(scenario.id, caseResult.data.cases);
+        await this.testCaseRepository.replaceForScenario(scenario.id, command.storyId, caseResult.data.cases);
         lastProvider = caseResult.provider;
         lastModel = caseResult.model;
         lastPromptVersion = caseResult.promptVersion;
@@ -145,6 +145,15 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
           severity: testCase.severity,
           testType: testCase.testType,
           automationStatus: testCase.automationStatus,
+          displayId: testCase.displayId,
+          testObjective: testCase.testObjective,
+          preconditions: testCase.preconditions,
+          dependencies: testCase.dependencies,
+          requestMethod: testCase.requestMethod,
+          requestPayload: testCase.requestPayload,
+          expectedStatusCode: testCase.expectedStatusCode,
+          expectedResponse: testCase.expectedResponse,
+          remarks: testCase.remarks,
         })),
       }));
 

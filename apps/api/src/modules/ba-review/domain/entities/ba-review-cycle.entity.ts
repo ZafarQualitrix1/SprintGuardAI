@@ -30,6 +30,17 @@ export interface TestCaseSnapshotEntry {
     severity: string;
     testType: string;
     automationStatus: string;
+    // Enterprise Test Generation fields -- optional since snapshots frozen before this migration
+    // won't have them.
+    displayId?: string | null;
+    testObjective?: string | null;
+    preconditions?: string[] | null;
+    dependencies?: string | null;
+    requestMethod?: string | null;
+    requestPayload?: Record<string, unknown> | null;
+    expectedStatusCode?: number | null;
+    expectedResponse?: string | null;
+    remarks?: string | null;
   }>;
 }
 

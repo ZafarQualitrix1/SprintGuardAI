@@ -17,6 +17,15 @@ export interface TestCase {
   automationType: string;
   apiEndpoint: string | null;
   uiScreen: string | null;
+  displayId: string | null;
+  testObjective: string | null;
+  preconditions: string[] | null;
+  dependencies: string | null;
+  requestMethod: string | null;
+  requestPayload: Record<string, unknown> | null;
+  expectedStatusCode: number | null;
+  expectedResponse: string | null;
+  remarks: string | null;
 }
 
 export interface TestScenario {

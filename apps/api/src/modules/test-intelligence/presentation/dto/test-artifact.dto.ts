@@ -19,6 +19,15 @@ export class TestCaseDto {
   @ApiProperty() automationType!: string;
   @ApiPropertyOptional({ nullable: true }) apiEndpoint!: string | null;
   @ApiPropertyOptional({ nullable: true }) uiScreen!: string | null;
+  @ApiPropertyOptional({ nullable: true }) displayId!: string | null;
+  @ApiPropertyOptional({ nullable: true }) testObjective!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: [String] }) preconditions!: string[] | null;
+  @ApiPropertyOptional({ nullable: true }) dependencies!: string | null;
+  @ApiPropertyOptional({ nullable: true }) requestMethod!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: Object }) requestPayload!: Record<string, unknown> | null;
+  @ApiPropertyOptional({ nullable: true }) expectedStatusCode!: number | null;
+  @ApiPropertyOptional({ nullable: true }) expectedResponse!: string | null;
+  @ApiPropertyOptional({ nullable: true }) remarks!: string | null;
 }
 
 export class TestScenarioDto {

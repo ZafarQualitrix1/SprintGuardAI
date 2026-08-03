@@ -18,6 +18,22 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Enter a valid email address'),
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const googleSignInSchema = z.object({
+  credential: z.string().min(1, 'Missing Google credential'),
+});
+export type GoogleSignInInput = z.infer<typeof googleSignInSchema>;
+
 export interface AuthUser {
   id: string;
   email: string;

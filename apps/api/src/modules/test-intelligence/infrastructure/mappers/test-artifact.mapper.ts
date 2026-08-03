@@ -19,6 +19,15 @@ export function toTestCaseEntity(row: TestCase): TestCaseEntity {
     row.automationType,
     row.apiEndpoint,
     row.uiScreen,
+    row.displayId,
+    row.testObjective,
+    row.preconditions as unknown as string[] | null,
+    row.dependencies,
+    row.requestMethod,
+    row.requestPayload as unknown as Record<string, unknown> | null,
+    row.expectedStatusCode,
+    row.expectedResponse,
+    row.remarks,
   );
 }
 

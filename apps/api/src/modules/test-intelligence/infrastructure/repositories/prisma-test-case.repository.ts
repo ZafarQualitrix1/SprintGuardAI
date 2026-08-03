@@ -12,15 +12,36 @@ import { TestCaseEntity } from '../../domain/entities/test-artifact.entity';
 export class PrismaTestCaseRepository implements ITestCaseRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async replaceForScenario(testScenarioId: string, cases: CreateTestCaseInput[]) {
+  // Atomically reserves `count` sequence numbers for storyId and returns the display-ID prefix +
+  // the first number in the reserved block -- callers assign prefix-{first}, prefix-{first+1}, ...
+  private async reserveDisplayIdBlock(
+    tx: Prisma.TransactionClient,
+    storyId: string,
+    count: number,
+  ): Promise<{ prefix: string; first: number } | null> {
+    if (count === 0) return null;
+    const story = await tx.story.update({
+      where: { id: storyId },
+      data: { testCaseSequenceCounter: { increment: count } },
+      select: { testCaseSequenceCounter: true, externalId: true },
+    });
+    const first = story.testCaseSequenceCounter - count + 1;
+    return { prefix: story.externalId ?? storyId, first };
+  }
+
+  async replaceForScenario(testScenarioId: string, storyId: string, cases: CreateTestCaseInput[]) {
     const rows = await this.prisma.$transaction(async (tx) => {
       await tx.testCase.deleteMany({ where: { testScenarioId } });
 
+      const block = await this.reserveDisplayIdBlock(tx, storyId, cases.length);
+
       const created = [];
-      for (const testCase of cases) {
+      for (let i = 0; i < cases.length; i++) {
+        const testCase = cases[i];
         const row = await tx.testCase.create({
           data: {
             testScenarioId,
+            displayId: block ? `${block.prefix}-TC-${block.first + i}` : null,
             title: testCase.title,
             steps: testCase.steps as unknown as Prisma.InputJsonValue,
             priority: testCase.priority,
@@ -33,6 +54,14 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
             automationType: testCase.automationType,
             apiEndpoint: testCase.apiEndpoint,
             uiScreen: testCase.uiScreen,
+            testObjective: testCase.testObjective,
+            preconditions: testCase.preconditions as unknown as Prisma.InputJsonValue,
+            dependencies: testCase.dependencies,
+            requestMethod: testCase.requestMethod,
+            requestPayload: testCase.requestPayload as unknown as Prisma.InputJsonValue,
+            expectedStatusCode: testCase.expectedStatusCode,
+            expectedResponse: testCase.expectedResponse,
+            remarks: testCase.remarks,
           },
         });
         created.push(row);
@@ -81,14 +110,32 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
             ...(fields.automationType !== undefined ? { automationType: fields.automationType } : {}),
             ...(fields.apiEndpoint !== undefined ? { apiEndpoint: fields.apiEndpoint } : {}),
             ...(fields.uiScreen !== undefined ? { uiScreen: fields.uiScreen } : {}),
+            ...(fields.testObjective !== undefined ? { testObjective: fields.testObjective } : {}),
+            ...(fields.preconditions !== undefined
+              ? { preconditions: fields.preconditions as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(fields.dependencies !== undefined ? { dependencies: fields.dependencies } : {}),
+            ...(fields.requestMethod !== undefined ? { requestMethod: fields.requestMethod } : {}),
+            ...(fields.requestPayload !== undefined
+              ? { requestPayload: fields.requestPayload as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(fields.expectedStatusCode !== undefined ? { expectedStatusCode: fields.expectedStatusCode } : {}),
+            ...(fields.expectedResponse !== undefined ? { expectedResponse: fields.expectedResponse } : {}),
+            ...(fields.remarks !== undefined ? { remarks: fields.remarks } : {}),
+            // displayId is deliberately never updated -- it's minted once and stays stable across
+            // every BA-review version, per CreateTestCaseInput's own documentation.
           },
         });
       }
 
-      for (const testCase of changeset.added) {
+      const block = await this.reserveDisplayIdBlock(tx, changeset.storyId, changeset.added.length);
+
+      for (let i = 0; i < changeset.added.length; i++) {
+        const testCase = changeset.added[i];
         await tx.testCase.create({
           data: {
             testScenarioId: testCase.testScenarioId,
+            displayId: block ? `${block.prefix}-TC-${block.first + i}` : null,
             title: testCase.title,
             steps: testCase.steps as unknown as Prisma.InputJsonValue,
             priority: testCase.priority,
@@ -101,6 +148,14 @@ export class PrismaTestCaseRepository implements ITestCaseRepository {
             automationType: testCase.automationType,
             apiEndpoint: testCase.apiEndpoint,
             uiScreen: testCase.uiScreen,
+            testObjective: testCase.testObjective,
+            preconditions: testCase.preconditions as unknown as Prisma.InputJsonValue,
+            dependencies: testCase.dependencies,
+            requestMethod: testCase.requestMethod,
+            requestPayload: testCase.requestPayload as unknown as Prisma.InputJsonValue,
+            expectedStatusCode: testCase.expectedStatusCode,
+            expectedResponse: testCase.expectedResponse,
+            remarks: testCase.remarks,
           },
         });
         affectedScenarioIds.add(testCase.testScenarioId);

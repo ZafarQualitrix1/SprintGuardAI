@@ -152,6 +152,7 @@ export interface Invitation {
 export interface InviteMemberResult {
   invitation: Invitation;
   token: string;
+  emailSent: boolean;
 }
 
 export interface OrganizationBranding {

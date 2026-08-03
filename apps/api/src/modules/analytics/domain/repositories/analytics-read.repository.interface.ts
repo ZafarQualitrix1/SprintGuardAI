@@ -12,6 +12,10 @@ export interface DashboardSummaryResult {
   openRisksCount: number;
   releaseReadinessPercent: number | null;
   velocityTrend: VelocityPoint[];
+  totalTestCases: number;
+  openDefectsCount: number;
+  storyStatusBreakdown: Record<'BACKLOG' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE' | 'BLOCKED', number>;
+  executionStatusBreakdown: Record<'NOT_RUN' | 'PASSED' | 'FAILED' | 'BLOCKED' | 'SKIPPED', number>;
 }
 
 export interface IAnalyticsReadRepository {

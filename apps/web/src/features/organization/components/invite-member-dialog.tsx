@@ -28,6 +28,7 @@ interface InviteMemberDialogProps {
 export function InviteMemberDialog({ open, onOpenChange }: InviteMemberDialogProps) {
   const invite = useInviteMember();
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   const {
     register,
@@ -45,7 +46,15 @@ export function InviteMemberDialog({ open, onOpenChange }: InviteMemberDialogPro
     invite.mutate(values, {
       onSuccess: (result) => {
         setInviteLink(`${window.location.origin}/accept-invitation?token=${result.token}`);
-        toast({ title: 'Invitation created', description: values.email });
+        setEmailSent(result.emailSent);
+        toast(
+          result.emailSent
+            ? { title: 'Invitation emailed', description: values.email }
+            : {
+                title: 'Invitation created, but the email could not be sent',
+                description: 'Copy the link below and share it with the invitee directly.',
+              },
+        );
       },
       onError: (error) =>
         toast({
@@ -60,6 +69,7 @@ export function InviteMemberDialog({ open, onOpenChange }: InviteMemberDialogPro
     if (!nextOpen) {
       reset();
       setInviteLink(null);
+      setEmailSent(false);
     }
     onOpenChange(nextOpen);
   };
@@ -70,7 +80,11 @@ export function InviteMemberDialog({ open, onOpenChange }: InviteMemberDialogPro
         <DialogHeader>
           <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
-            No email delivery is configured yet -- copy the generated link and share it with the invitee directly.
+            {inviteLink
+              ? emailSent
+                ? "We've emailed the invite link below. You can also copy it to share directly."
+                : "The invite email couldn't be sent -- copy the link below and share it with the invitee directly."
+              : "We'll email an invite link to this address."}
           </DialogDescription>
         </DialogHeader>
         {inviteLink ? (

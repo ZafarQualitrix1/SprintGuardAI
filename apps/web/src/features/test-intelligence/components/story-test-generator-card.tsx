@@ -1,6 +1,7 @@
 'use client';
 
-import { Wand2 } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, Wand2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,8 @@ import { useBaReviewStatus } from '@/features/ba-review/api';
 import { BaReviewStatusBadge } from '@/features/ba-review/components';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
-import type { Story } from '@sprintguard/shared';
+import { cn } from '@/lib/utils';
+import type { Story, TestCase } from '@sprintguard/shared';
 
 const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'destructive'> = {
   LOW: 'secondary',
@@ -22,6 +24,80 @@ const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'des
 
 interface StoryTestGeneratorCardProps {
   story: Pick<Story, 'id' | 'title'>;
+}
+
+// Enterprise Test Generation fields don't fit inline without overwhelming an already-dense card --
+// collapsed by default, one toggle per test case.
+function TestCaseDetails({ testCase }: { testCase: TestCase }) {
+  const [open, setOpen] = useState(false);
+  const hasDetails =
+    testCase.testObjective ||
+    (testCase.preconditions && testCase.preconditions.length > 0) ||
+    testCase.dependencies ||
+    testCase.requestMethod ||
+    testCase.expectedStatusCode !== null ||
+    testCase.expectedResponse ||
+    testCase.remarks;
+  if (!hasDetails) return null;
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <ChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} />
+        {testCase.displayId ? `${testCase.displayId} · Details` : 'Details'}
+      </button>
+      {open ? (
+        <dl className="mt-1 grid grid-cols-1 gap-x-4 gap-y-1 rounded bg-background/50 p-2 text-xs sm:grid-cols-2">
+          {testCase.testObjective ? (
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-muted-foreground">Objective</dt>
+              <dd>{testCase.testObjective}</dd>
+            </div>
+          ) : null}
+          {testCase.preconditions && testCase.preconditions.length > 0 ? (
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-muted-foreground">Preconditions</dt>
+              <dd>{testCase.preconditions.join(', ')}</dd>
+            </div>
+          ) : null}
+          {testCase.dependencies ? (
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-muted-foreground">Dependencies</dt>
+              <dd>{testCase.dependencies}</dd>
+            </div>
+          ) : null}
+          {testCase.requestMethod ? (
+            <div>
+              <dt className="font-medium text-muted-foreground">Request</dt>
+              <dd>{testCase.requestMethod}</dd>
+            </div>
+          ) : null}
+          {testCase.expectedStatusCode !== null ? (
+            <div>
+              <dt className="font-medium text-muted-foreground">Expected Status</dt>
+              <dd>{testCase.expectedStatusCode}</dd>
+            </div>
+          ) : null}
+          {testCase.expectedResponse ? (
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-muted-foreground">Expected Response</dt>
+              <dd>{testCase.expectedResponse}</dd>
+            </div>
+          ) : null}
+          {testCase.remarks ? (
+            <div className="sm:col-span-2">
+              <dt className="font-medium text-muted-foreground">Remarks</dt>
+              <dd>{testCase.remarks}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+    </div>
+  );
 }
 
 export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
@@ -106,6 +182,7 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
                           </li>
                         ))}
                       </ol>
+                      <TestCaseDetails testCase={testCase} />
                     </div>
                   ))}
                 </div>

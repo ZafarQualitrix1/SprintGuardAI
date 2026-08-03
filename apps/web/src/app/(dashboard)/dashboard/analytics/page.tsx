@@ -11,8 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SummaryCard } from '@/features/analytics/components/summary-card';
 import { VelocityTrendChart } from '@/features/analytics/components/velocity-trend-chart';
-import { StoryStatusChart } from '@/features/analytics/components/story-status-chart';
-import { ExecutionStatusChart } from '@/features/analytics/components/execution-status-chart';
+import { countStoriesByStatus, StoryStatusChart } from '@/features/analytics/components/story-status-chart';
+import { countExecutionsByStatus, ExecutionStatusChart } from '@/features/analytics/components/execution-status-chart';
 import { useDashboardSummary } from '@/features/analytics/api';
 import { useProjects, useSprint, useSprints } from '@/features/sprint/api';
 import { useCoverage } from '@/features/coverage/api';
@@ -201,7 +201,7 @@ export default function AnalyticsPage() {
                 ) : !sprint?.stories.length ? (
                   <p className="text-sm text-muted-foreground">No stories in this sprint.</p>
                 ) : (
-                  <StoryStatusChart stories={sprint.stories} />
+                  <StoryStatusChart counts={countStoriesByStatus(sprint.stories)} />
                 )}
               </CardContent>
             </Card>
@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
                   />
                 ) : (
                   <>
-                    <ExecutionStatusChart executions={executions} />
+                    <ExecutionStatusChart counts={countExecutionsByStatus(executions)} />
                     <p className="mt-2 text-sm text-muted-foreground">
                       Pass rate: <span className="font-medium text-foreground">{formatPercent(executionPassRate)}</span>
                     </p>

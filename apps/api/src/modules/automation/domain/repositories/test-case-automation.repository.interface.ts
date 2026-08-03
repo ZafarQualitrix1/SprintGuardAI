@@ -27,4 +27,10 @@ export interface ITestCaseAutomationRepository {
   findById(testCaseId: string, organizationId: string): Promise<TestCaseAutomationContext | null>;
   listCandidatesBySprintId(sprintId: string, organizationId: string): Promise<TestCaseAutomationContext[]>;
   markAutomated(testCaseId: string): Promise<void>;
+  // Self-healing backfill for test cases generated before the AI reliably classified
+  // automationStatus/automationType (both left at their MANUAL/NONE defaults -- see
+  // test-generation.schema.ts). Any such case that already has an apiEndpoint or uiScreen set is
+  // clearly describing an API/UI interaction, so it's reclassified as AUTOMATABLE with the
+  // matching type. Returns the number of test cases updated.
+  reclassifyStaleCandidates(sprintId: string, organizationId: string): Promise<number>;
 }

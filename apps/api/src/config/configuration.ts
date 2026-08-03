@@ -50,6 +50,18 @@ export default () => ({
     otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     logLevel: process.env.LOG_LEVEL,
   },
+  // Forgot-password email delivery (Resend). Optional so unrelated boots don't hard-fail if
+  // unset; ForgotPasswordHandler/ResendEmailSender reject clearly if a reset is requested while
+  // unconfigured, same "fail loud, not silently" pattern as githubActions above.
+  email: {
+    resendApiKey: process.env.RESEND_API_KEY,
+    fromAddress: process.env.EMAIL_FROM_ADDRESS,
+  },
+  // Google Identity Services sign-in (ID-token flow -- no client secret needed, see
+  // GoogleSignInHandler). Optional for the same reason as email above.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+  },
   throttle: {
     ttl: parseInt(process.env.THROTTLE_TTL ?? '60', 10),
     limit: parseInt(process.env.THROTTLE_LIMIT ?? '100', 10),

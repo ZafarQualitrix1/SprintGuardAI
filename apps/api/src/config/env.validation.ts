@@ -46,6 +46,14 @@ export const envSchema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug', 'verbose']).default('info'),
 
+  // Forgot-password email delivery -- optional so unrelated boots don't hard-fail if unset;
+  // ResendEmailSender rejects clearly if a reset is requested while unconfigured.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM_ADDRESS: z.string().email().optional(),
+
+  // Google Identity Services sign-in -- optional for the same reason as RESEND_API_KEY above.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+
   THROTTLE_TTL: z.coerce.number().int().positive().default(60),
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });

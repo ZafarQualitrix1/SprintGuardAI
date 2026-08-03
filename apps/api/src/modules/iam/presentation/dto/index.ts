@@ -4,3 +4,6 @@ export * from './login.dto';
 export * from './auth-user.dto';
 export * from './accept-invitation.dto';
 export * from './update-user.dto';
+export * from './forgot-password.dto';
+export * from './reset-password.dto';
+export * from './google-sign-in.dto';

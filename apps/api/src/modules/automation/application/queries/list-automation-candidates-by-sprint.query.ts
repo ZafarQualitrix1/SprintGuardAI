@@ -34,6 +34,12 @@ export class ListAutomationCandidatesBySprintHandler
   ) {}
 
   async execute(query: ListAutomationCandidatesBySprintQuery): Promise<AutomationCandidateResult[]> {
+    // Self-heal test cases generated before automationStatus/automationType were reliably
+    // classified (see test-generation.schema.ts) -- cheap (one updateMany per type, no AI calls),
+    // safe to run on every fetch since it only ever touches cases still sitting at the MANUAL/NONE
+    // defaults with an apiEndpoint/uiScreen already on record.
+    await this.testCaseRepository.reclassifyStaleCandidates(query.sprintId, query.organizationId);
+
     const candidates = await this.testCaseRepository.listCandidatesBySprintId(query.sprintId, query.organizationId);
     if (candidates.length === 0) return [];
 

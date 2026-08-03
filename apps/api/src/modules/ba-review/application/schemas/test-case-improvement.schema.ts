@@ -34,6 +34,16 @@ const testCaseFieldsSchema = z.object({
   automationType: automationTypeSchema.default('NONE'),
   apiEndpoint: z.string().min(1).nullable().default(null),
   uiScreen: z.string().min(1).nullable().default(null),
+  // Enterprise Test Generation fields -- kept in lockstep with test-generation.schema.ts's
+  // testCaseOutputSchema.
+  testObjective: z.string().min(1).nullable().default(null),
+  preconditions: z.array(z.string().min(1)).nullable().default(null),
+  dependencies: z.string().min(1).nullable().default(null),
+  requestMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).nullable().default(null),
+  requestPayload: z.record(z.unknown()).nullable().default(null),
+  expectedStatusCode: z.number().int().nullable().default(null),
+  expectedResponse: z.string().min(1).nullable().default(null),
+  remarks: z.string().min(1).nullable().default(null),
 });
 
 // Output of the `test-case-improvement` capability -- takes the BA's feedback plus the existing

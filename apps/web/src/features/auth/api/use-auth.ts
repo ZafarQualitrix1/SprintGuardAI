@@ -31,6 +31,24 @@ export function useAcceptInvitation() {
   });
 }
 
+export function useForgotPassword() {
+  return useMutation({ mutationFn: authApi.forgotPassword });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: authApi.resetPassword,
+    onSuccess: applySession,
+  });
+}
+
+export function useGoogleSignIn() {
+  return useMutation({
+    mutationFn: authApi.googleSignIn,
+    onSuccess: applySession,
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({

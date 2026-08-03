@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EmailModule } from '../email/email.module';
 import { OrganizationSettingsController } from './presentation/organization-settings.controller';
 import { ORGANIZATION_SETTINGS_COMMAND_HANDLERS } from './application/commands';
 import { ORGANIZATION_SETTINGS_QUERY_HANDLERS } from './application/queries';
@@ -23,6 +24,7 @@ import {
 // `ai` module (AiProviderConfig/UsageQuota) -- this module only stores the org-wide AI toggles
 // that don't belong to a specific provider.
 @Module({
+  imports: [EmailModule],
   controllers: [OrganizationSettingsController],
   providers: [
     ...ORGANIZATION_SETTINGS_COMMAND_HANDLERS,

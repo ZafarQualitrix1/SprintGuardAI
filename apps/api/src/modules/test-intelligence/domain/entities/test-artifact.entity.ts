@@ -41,6 +41,16 @@ export class TestCaseEntity {
     public readonly automationType: AutomationType,
     public readonly apiEndpoint: string | null,
     public readonly uiScreen: string | null,
+    // Enterprise Test Generation fields.
+    public readonly displayId: string | null = null,
+    public readonly testObjective: string | null = null,
+    public readonly preconditions: string[] | null = null,
+    public readonly dependencies: string | null = null,
+    public readonly requestMethod: string | null = null,
+    public readonly requestPayload: Record<string, unknown> | null = null,
+    public readonly expectedStatusCode: number | null = null,
+    public readonly expectedResponse: string | null = null,
+    public readonly remarks: string | null = null,
   ) {}
 }
 

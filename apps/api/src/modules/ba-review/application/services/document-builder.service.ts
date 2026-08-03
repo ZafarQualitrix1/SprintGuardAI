@@ -56,20 +56,31 @@ export class DocumentBuilderService {
       'Distribution',
     );
 
+    // Column set intentionally scoped to what's already in the frozen snapshot -- this workbook is
+    // the compact, auto-attached Jira document. Story/Execution-joined fields (Feature Name,
+    // Actual Result/Status) belong to the fuller, user-triggered export endpoint instead.
     const caseRows: Record<string, unknown>[] = [];
     for (const scenario of input.testCasesSnapshot) {
       for (const testCase of scenario.testCases) {
         caseRows.push({
           Scenario: scenario.scenarioTitle,
-          'Test Case ID': testCase.id,
+          'Test Case ID': testCase.displayId ?? testCase.id,
           Title: testCase.title,
+          'Test Objective': testCase.testObjective ?? '',
           Description: testCase.description ?? '',
+          Preconditions: (testCase.preconditions ?? []).join(' | '),
+          Dependencies: testCase.dependencies ?? '',
           Steps: testCase.steps.map((step) => step.step).join(' | '),
           'Expected Results': testCase.steps.map((step) => step.expected).join(' | '),
+          'Request Method': testCase.requestMethod ?? '',
+          'Request Payload': testCase.requestPayload ? JSON.stringify(testCase.requestPayload) : '',
+          'Expected Status Code': testCase.expectedStatusCode ?? '',
+          'Expected Response': testCase.expectedResponse ?? '',
           Priority: testCase.priority,
           Severity: testCase.severity,
           'Test Type': testCase.testType,
           'Automation Status': testCase.automationStatus,
+          Remarks: testCase.remarks ?? '',
         });
       }
     }

@@ -1,7 +1,6 @@
 'use client';
 
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { Story } from '@sprintguard/shared';
 
 // Same CSS-variable-driven styling as velocity-trend-chart.tsx so both charts repaint correctly
 // on theme toggle instead of using Recharts' hardcoded light-mode defaults.
@@ -15,7 +14,15 @@ const tooltipContentStyle = {
 };
 
 const STATUS_ORDER = ['BACKLOG', 'IN_PROGRESS', 'IN_REVIEW', 'BLOCKED', 'DONE'] as const;
-const STATUS_COLOR: Record<(typeof STATUS_ORDER)[number], string> = {
+export type StoryStatusKey = (typeof STATUS_ORDER)[number];
+const STATUS_LABEL: Record<StoryStatusKey, string> = {
+  BACKLOG: 'Backlog',
+  IN_PROGRESS: 'In Progress',
+  IN_REVIEW: 'In Review',
+  BLOCKED: 'Blocked',
+  DONE: 'Done',
+};
+const STATUS_COLOR: Record<StoryStatusKey, string> = {
   BACKLOG: 'hsl(var(--secondary))',
   IN_PROGRESS: 'hsl(var(--warning))',
   IN_REVIEW: 'hsl(var(--warning))',
@@ -24,20 +31,17 @@ const STATUS_COLOR: Record<(typeof STATUS_ORDER)[number], string> = {
 };
 
 interface StoryStatusChartProps {
-  stories: Pick<Story, 'status'>[];
+  counts: Record<StoryStatusKey, number>;
 }
 
-export function StoryStatusChart({ stories }: StoryStatusChartProps) {
-  const data = STATUS_ORDER.map((status) => ({
-    status,
-    count: stories.filter((s) => s.status === status).length,
-  }));
+export function StoryStatusChart({ counts }: StoryStatusChartProps) {
+  const data = STATUS_ORDER.map((status) => ({ status, label: STATUS_LABEL[status], count: counts[status] }));
 
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data}>
         <XAxis
-          dataKey="status"
+          dataKey="label"
           tick={axisTickStyle}
           axisLine={{ stroke: 'hsl(var(--border))' }}
           tickLine={{ stroke: 'hsl(var(--border))' }}
@@ -57,4 +61,12 @@ export function StoryStatusChart({ stories }: StoryStatusChartProps) {
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+export function countStoriesByStatus(stories: { status: string }[]): Record<StoryStatusKey, number> {
+  const counts = Object.fromEntries(STATUS_ORDER.map((s) => [s, 0])) as Record<StoryStatusKey, number>;
+  for (const story of stories) {
+    if (story.status in counts) counts[story.status as StoryStatusKey]++;
+  }
+  return counts;
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { Execution } from '@sprintguard/shared';
 
 const axisTickStyle = { fill: 'hsl(var(--muted-foreground))', fontSize: 12 };
 const tooltipContentStyle = {
@@ -12,30 +11,35 @@ const tooltipContentStyle = {
   fontSize: 12,
 };
 
-const STATUS_ORDER = ['PASSED', 'FAILED', 'BLOCKED', 'SKIPPED', 'NOT_RUN'] as const;
+const STATUS_ORDER = ['PASSED', 'FAILED', 'BLOCKED', 'SKIPPED'] as const;
+export type ExecutionStatusKey = (typeof STATUS_ORDER)[number] | 'NOT_RUN';
+const STATUS_LABEL: Record<(typeof STATUS_ORDER)[number], string> = {
+  PASSED: 'Passed',
+  FAILED: 'Failed',
+  BLOCKED: 'Blocked',
+  SKIPPED: 'Skipped',
+};
 const STATUS_COLOR: Record<(typeof STATUS_ORDER)[number], string> = {
   PASSED: 'hsl(var(--success))',
   FAILED: 'hsl(var(--destructive))',
   BLOCKED: 'hsl(var(--warning))',
   SKIPPED: 'hsl(var(--secondary))',
-  NOT_RUN: 'hsl(var(--muted))',
 };
 
 interface ExecutionStatusChartProps {
-  executions: Pick<Execution, 'status'>[];
+  counts: Record<ExecutionStatusKey, number>;
 }
 
-export function ExecutionStatusChart({ executions }: ExecutionStatusChartProps) {
-  const data = STATUS_ORDER.filter((status) => status !== 'NOT_RUN').map((status) => ({
-    status,
-    count: executions.filter((e) => e.status === status).length,
-  }));
+export function ExecutionStatusChart({ counts }: ExecutionStatusChartProps) {
+  // NOT_RUN deliberately excluded from the bars -- "not yet executed" isn't a result worth
+  // charting alongside pass/fail/blocked/skipped outcomes.
+  const data = STATUS_ORDER.map((status) => ({ status, label: STATUS_LABEL[status], count: counts[status] }));
 
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data}>
         <XAxis
-          dataKey="status"
+          dataKey="label"
           tick={axisTickStyle}
           axisLine={{ stroke: 'hsl(var(--border))' }}
           tickLine={{ stroke: 'hsl(var(--border))' }}
@@ -55,4 +59,12 @@ export function ExecutionStatusChart({ executions }: ExecutionStatusChartProps) 
       </BarChart>
     </ResponsiveContainer>
   );
+}
+
+export function countExecutionsByStatus(executions: { status: string }[]): Record<ExecutionStatusKey, number> {
+  const counts: Record<ExecutionStatusKey, number> = { PASSED: 0, FAILED: 0, BLOCKED: 0, SKIPPED: 0, NOT_RUN: 0 };
+  for (const execution of executions) {
+    if (execution.status in counts) counts[execution.status as ExecutionStatusKey]++;
+  }
+  return counts;
 }

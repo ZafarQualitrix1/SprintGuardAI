@@ -50,10 +50,24 @@ export const testCaseOutputSchema = z.object({
         module: z.string().min(1).nullable().default(null),
         testType: testTypeSchema.default('FUNCTIONAL'),
         tags: z.array(z.string().min(1)).default([]),
-        automationStatus: automationStatusSchema.default('MANUAL'),
-        automationType: automationTypeSchema.default('NONE'),
+        // Deliberately required (no .default) -- if these are optional, the model can silently
+        // omit them and every case falls back to MANUAL/NONE, which is exactly what made
+        // AI-generated test cases invisible on the Automation tab's AUTOMATABLE/AUTOMATED filter
+        // even when they were genuinely automatable. Omitting them now fails validation and
+        // triggers AiOrchestrationService's repair-retry instead of silently mis-classifying.
+        automationStatus: automationStatusSchema,
+        automationType: automationTypeSchema,
         apiEndpoint: z.string().min(1).nullable().default(null),
         uiScreen: z.string().min(1).nullable().default(null),
+        // Enterprise Test Generation fields.
+        testObjective: z.string().min(1).nullable().default(null),
+        preconditions: z.array(z.string().min(1)).nullable().default(null),
+        dependencies: z.string().min(1).nullable().default(null),
+        requestMethod: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).nullable().default(null),
+        requestPayload: z.record(z.unknown()).nullable().default(null),
+        expectedStatusCode: z.number().int().nullable().default(null),
+        expectedResponse: z.string().min(1).nullable().default(null),
+        remarks: z.string().min(1).nullable().default(null),
       }),
     )
     .min(1),

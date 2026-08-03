@@ -394,12 +394,23 @@ async function main() {
         'endpoint) or UI (if it primarily drives a browser), and fill apiEndpoint (e.g. "POST',
         '/api/v1/orders") or uiScreen (e.g. "Checkout page") accordingly -- otherwise leave both null.',
         '',
+        'Also fill in these enterprise fields where they genuinely apply to this case, else null:',
+        'testObjective (one sentence: what this case proves), preconditions (string[] of setup state',
+        'required before step 1), dependencies (e.g. "Requires TC-4 to run first" or a required',
+        'seeded account -- plain text, or null), and for API-type cases: requestMethod',
+        '("GET"|"POST"|"PUT"|"PATCH"|"DELETE"), requestPayload (example request body object, or',
+        'null), expectedStatusCode (integer), expectedResponse (short description of the response',
+        'body/shape). remarks is free-text for anything else a reviewer should know, or null.',
+        '',
         'Respond with ONLY valid JSON (no markdown fences, no commentary) matching exactly this shape:',
         '{"cases":[{"title":string,"description":string,"steps":[{"step":string,"expected":string}],',
         '"priority":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL","severity":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",',
         '"module":string|null,"testType":string,"tags":string[],',
         '"automationStatus":"MANUAL"|"AUTOMATABLE"|"AUTOMATED","automationType":"NONE"|"API"|"UI",',
-        '"apiEndpoint":string|null,"uiScreen":string|null}]}',
+        '"apiEndpoint":string|null,"uiScreen":string|null,"testObjective":string|null,',
+        '"preconditions":string[]|null,"dependencies":string|null,',
+        '"requestMethod":"GET"|"POST"|"PUT"|"PATCH"|"DELETE"|null,"requestPayload":object|null,',
+        '"expectedStatusCode":number|null,"expectedResponse":string|null,"remarks":string|null}]}',
       ].join('\n'),
       jsonSchema: {
         type: 'object',
@@ -410,7 +421,12 @@ async function main() {
             minItems: 1,
             items: {
               type: 'object',
-              required: ['title', 'steps', 'priority'],
+              // automationStatus/automationType are required here to match testCaseOutputSchema
+              // (apps/api/.../test-generation.schema.ts) -- leaving them optional let the model
+              // silently omit them, which defaulted every case to MANUAL/NONE and made
+              // AI-generated test cases invisible on the Automation tab regardless of whether they
+              // were genuinely automatable.
+              required: ['title', 'steps', 'priority', 'automationStatus', 'automationType'],
               properties: {
                 title: { type: 'string' },
                 description: { type: 'string' },
@@ -803,11 +819,17 @@ async function main() {
         '{"added":[{"scenarioId":string,"addReason":string,"title":string,"steps":[{"step":string,"expected":string}],',
         '"priority":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL","description":string|null,"severity":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",',
         '"module":string|null,"testType":string,"tags":string[],"automationStatus":"MANUAL"|"AUTOMATABLE"|"AUTOMATED",',
-        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null}],',
+        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null,',
+        '"testObjective":string|null,"preconditions":string[]|null,"dependencies":string|null,',
+        '"requestMethod":"GET"|"POST"|"PUT"|"PATCH"|"DELETE"|null,"requestPayload":object|null,',
+        '"expectedStatusCode":number|null,"expectedResponse":string|null,"remarks":string|null}],',
         '"modified":[{"id":string,"changeReason":string,"title":string,"steps":[{"step":string,"expected":string}],',
         '"priority":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL","description":string|null,"severity":"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",',
         '"module":string|null,"testType":string,"tags":string[],"automationStatus":"MANUAL"|"AUTOMATABLE"|"AUTOMATED",',
-        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null}],',
+        '"automationType":"NONE"|"API"|"UI","apiEndpoint":string|null,"uiScreen":string|null,',
+        '"testObjective":string|null,"preconditions":string[]|null,"dependencies":string|null,',
+        '"requestMethod":"GET"|"POST"|"PUT"|"PATCH"|"DELETE"|null,"requestPayload":object|null,',
+        '"expectedStatusCode":number|null,"expectedResponse":string|null,"remarks":string|null}],',
         '"removed":[{"id":string,"reason":string}],',
         '"improvementSummary":{"feedbackSummary":string,"coverageImpact":string,"automationReadinessImpact":string,"traceabilityImpact":string}}',
         '',

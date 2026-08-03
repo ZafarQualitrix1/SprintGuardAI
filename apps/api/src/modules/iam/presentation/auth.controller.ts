@@ -20,12 +20,18 @@ import { LoginCommand } from '../application/commands/login.command';
 import { RefreshSessionCommand } from '../application/commands/refresh-session.command';
 import { LogoutCommand } from '../application/commands/logout.command';
 import { AcceptInvitationCommand } from '../application/commands/accept-invitation.command';
+import { ForgotPasswordCommand } from '../application/commands/forgot-password.command';
+import { ResetPasswordCommand } from '../application/commands/reset-password.command';
+import { GoogleSignInCommand } from '../application/commands/google-sign-in.command';
 import { GetCurrentUserQuery } from '../application/queries/get-current-user.query';
 import { AuthSessionResult } from '../application/commands/auth-session.types';
 import { AuthResponseDto } from './dto/auth-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { GoogleSignInDto } from './dto/google-sign-in.dto';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 // Scoped to the refresh endpoint only -- the browser never attaches this cookie to any other
@@ -90,6 +96,43 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const session = await this.commandBus.execute<AcceptInvitationCommand, AuthSessionResult>(
       new AcceptInvitationCommand(dto.token, dto.fullName, dto.password),
+    );
+    this.setRefreshCookie(res, session);
+    return this.toResponse(session);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    await this.commandBus.execute(new ForgotPasswordCommand(dto.email));
+    // Same response whether or not the email is registered -- see ForgotPasswordCommand.
+    return { message: 'If an account exists for that email, a reset link has been sent.' };
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const session = await this.commandBus.execute<ResetPasswordCommand, AuthSessionResult>(
+      new ResetPasswordCommand(dto.token, dto.password),
+    );
+    this.setRefreshCookie(res, session);
+    return this.toResponse(session);
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('google')
+  async googleSignIn(
+    @Body() dto: GoogleSignInDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const session = await this.commandBus.execute<GoogleSignInCommand, AuthSessionResult>(
+      new GoogleSignInCommand(dto.credential),
     );
     this.setRefreshCookie(res, session);
     return this.toResponse(session);

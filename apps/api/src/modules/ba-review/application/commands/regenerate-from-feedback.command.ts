@@ -101,6 +101,7 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
       const { added, modified, removed, improvementSummary } = result.data;
 
       await this.testCaseRepository.applyChangeset({
+        storyId: command.storyId,
         added: added.map((tc) => ({
           testScenarioId: tc.scenarioId,
           title: tc.title,
@@ -115,6 +116,14 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
           automationType: tc.automationType,
           apiEndpoint: tc.apiEndpoint,
           uiScreen: tc.uiScreen,
+          testObjective: tc.testObjective,
+          preconditions: tc.preconditions,
+          dependencies: tc.dependencies,
+          requestMethod: tc.requestMethod,
+          requestPayload: tc.requestPayload,
+          expectedStatusCode: tc.expectedStatusCode,
+          expectedResponse: tc.expectedResponse,
+          remarks: tc.remarks,
         })),
         modified: modified.map((tc) => ({
           id: tc.id,
@@ -130,6 +139,14 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
           automationType: tc.automationType,
           apiEndpoint: tc.apiEndpoint,
           uiScreen: tc.uiScreen,
+          testObjective: tc.testObjective,
+          preconditions: tc.preconditions,
+          dependencies: tc.dependencies,
+          requestMethod: tc.requestMethod,
+          requestPayload: tc.requestPayload,
+          expectedStatusCode: tc.expectedStatusCode,
+          expectedResponse: tc.expectedResponse,
+          remarks: tc.remarks,
         })),
         removedIds: removed.map((r) => r.id),
       });
@@ -147,6 +164,15 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
           severity: testCase.severity,
           testType: testCase.testType,
           automationStatus: testCase.automationStatus,
+          displayId: testCase.displayId,
+          testObjective: testCase.testObjective,
+          preconditions: testCase.preconditions,
+          dependencies: testCase.dependencies,
+          requestMethod: testCase.requestMethod,
+          requestPayload: testCase.requestPayload,
+          expectedStatusCode: testCase.expectedStatusCode,
+          expectedResponse: testCase.expectedResponse,
+          remarks: testCase.remarks,
         })),
       }));
 

@@ -12,40 +12,76 @@ const VELOCITY_TREND_SPRINT_COUNT = 10;
 // feature ships, with no change needed here.
 const OPEN_RISK_SCORE_THRESHOLD = 60;
 
+const STORY_STATUSES = ['BACKLOG', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'BLOCKED'] as const;
+const EXECUTION_STATUSES = ['NOT_RUN', 'PASSED', 'FAILED', 'BLOCKED', 'SKIPPED'] as const;
+
 @Injectable()
 export class PrismaAnalyticsReadRepository implements IAnalyticsReadRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async getDashboardSummary(organizationId: string): Promise<DashboardSummaryResult> {
-    const [projectsCount, activeSprintsCount, coverageEntries, releaseReports, openRisksCount, recentSprints] =
-      await Promise.all([
-        this.prisma.project.count({ where: { organizationId } }),
-        this.prisma.sprint.count({ where: { project: { organizationId }, status: 'ACTIVE' } }),
-        this.prisma.coverageMatrixEntry.findMany({
-          where: { project: { organizationId } },
-          select: { sprintId: true, coverageStatus: true },
-        }),
-        this.prisma.releaseReport.findMany({
-          where: { project: { organizationId } },
-          select: { sprintId: true, readinessScore: true, createdAt: true },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.riskAssessment.count({
-          where: { sprint: { project: { organizationId } }, riskScore: { gte: OPEN_RISK_SCORE_THRESHOLD } },
-        }),
-        this.prisma.sprint.findMany({
-          where: { project: { organizationId } },
-          select: {
-            id: true,
-            name: true,
-            startDate: true,
-            createdAt: true,
-            stories: { select: { storyPoints: true, status: true } },
-          },
-          orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
-          take: VELOCITY_TREND_SPRINT_COUNT,
-        }),
-      ]);
+    const [
+      projectsCount,
+      activeSprintsCount,
+      coverageEntries,
+      releaseReports,
+      openRisksCount,
+      recentSprints,
+      totalTestCases,
+      openDefectsCount,
+      storyStatusGroups,
+      executionStatusGroups,
+    ] = await Promise.all([
+      this.prisma.project.count({ where: { organizationId } }),
+      this.prisma.sprint.count({ where: { project: { organizationId }, status: 'ACTIVE' } }),
+      this.prisma.coverageMatrixEntry.findMany({
+        where: { project: { organizationId } },
+        select: { sprintId: true, coverageStatus: true },
+      }),
+      this.prisma.releaseReport.findMany({
+        where: { project: { organizationId } },
+        select: { sprintId: true, readinessScore: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.riskAssessment.count({
+        where: { sprint: { project: { organizationId } }, riskScore: { gte: OPEN_RISK_SCORE_THRESHOLD } },
+      }),
+      this.prisma.sprint.findMany({
+        where: { project: { organizationId } },
+        select: {
+          id: true,
+          name: true,
+          startDate: true,
+          createdAt: true,
+          project: { select: { key: true } },
+          stories: { select: { storyPoints: true, status: true } },
+        },
+        orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
+        take: VELOCITY_TREND_SPRINT_COUNT,
+      }),
+      this.prisma.testCase.count({
+        where: { testScenario: { story: { sprint: { project: { organizationId } } } } },
+      }),
+      this.prisma.defect.count({
+        where: {
+          status: { in: ['OPEN', 'IN_PROGRESS'] },
+          OR: [
+            { story: { sprint: { project: { organizationId } } } },
+            { execution: { sprint: { project: { organizationId } } } },
+          ],
+        },
+      }),
+      this.prisma.story.groupBy({
+        by: ['status'],
+        where: { sprint: { project: { organizationId } } },
+        _count: { _all: true },
+      }),
+      this.prisma.execution.groupBy({
+        by: ['status'],
+        where: { sprint: { project: { organizationId } } },
+        _count: { _all: true },
+      }),
+    ]);
 
     const avgCoveragePercent = this.averageCoveragePercent(coverageEntries);
     const releaseReadinessPercent = this.averageLatestReadiness(releaseReports);
@@ -58,7 +94,19 @@ export class PrismaAnalyticsReadRepository implements IAnalyticsReadRepository {
       openRisksCount,
       releaseReadinessPercent,
       velocityTrend,
+      totalTestCases,
+      openDefectsCount,
+      storyStatusBreakdown: this.toBreakdown(STORY_STATUSES, storyStatusGroups),
+      executionStatusBreakdown: this.toBreakdown(EXECUTION_STATUSES, executionStatusGroups),
     };
+  }
+
+  private toBreakdown<T extends string>(
+    statuses: readonly T[],
+    groups: { status: T; _count: { _all: number } }[],
+  ): Record<T, number> {
+    const counts = new Map(groups.map((g) => [g.status, g._count._all]));
+    return Object.fromEntries(statuses.map((status) => [status, counts.get(status) ?? 0])) as Record<T, number>;
   }
 
   private averageCoveragePercent(entries: { sprintId: string; coverageStatus: string }[]): number | null {
@@ -98,12 +146,19 @@ export class PrismaAnalyticsReadRepository implements IAnalyticsReadRepository {
   }
 
   private buildVelocityTrend(
-    sprints: { id: string; name: string; startDate: Date | null; stories: { storyPoints: number | null; status: string }[] }[],
+    sprints: {
+      id: string;
+      name: string;
+      startDate: Date | null;
+      project: { key: string };
+      stories: { storyPoints: number | null; status: string }[];
+    }[],
   ): VelocityPoint[] {
-    // Fetched newest-first (for the `take` limit to select the *most recent* N sprints); reverse
-    // to chronological order so the trend chart reads left-to-right as oldest-to-newest.
+    // Two different Jira boards can each have a sprint literally named "Sprint 0" -- prefix with
+    // the project key so the chart never shows ambiguous duplicate labels for genuinely different
+    // sprints (Solution note: this was silently broken before, showing identical x-axis labels).
     return [...sprints].reverse().map((sprint) => ({
-      sprintName: sprint.name,
+      sprintName: `${sprint.project.key} · ${sprint.name}`,
       pointsCompleted: sprint.stories
         .filter((story) => story.status === 'DONE')
         .reduce((sum, story) => sum + (story.storyPoints ?? 0), 0),

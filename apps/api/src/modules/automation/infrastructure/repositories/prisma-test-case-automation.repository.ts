@@ -90,4 +90,25 @@ export class PrismaTestCaseAutomationRepository implements ITestCaseAutomationRe
   async markAutomated(testCaseId: string): Promise<void> {
     await this.prisma.testCase.update({ where: { id: testCaseId }, data: { automationStatus: 'AUTOMATED' } });
   }
+
+  async reclassifyStaleCandidates(sprintId: string, organizationId: string): Promise<number> {
+    const staleScope = {
+      automationStatus: 'MANUAL' as const,
+      automationType: 'NONE' as const,
+      testScenario: { story: { sprintId, sprint: { project: { organizationId } } } },
+    };
+
+    const [apiReclassified, uiReclassified] = await Promise.all([
+      this.prisma.testCase.updateMany({
+        where: { ...staleScope, apiEndpoint: { not: null } },
+        data: { automationStatus: 'AUTOMATABLE', automationType: 'API' },
+      }),
+      this.prisma.testCase.updateMany({
+        where: { ...staleScope, apiEndpoint: null, uiScreen: { not: null } },
+        data: { automationStatus: 'AUTOMATABLE', automationType: 'UI' },
+      }),
+    ]);
+
+    return apiReclassified.count + uiReclassified.count;
+  }
 }
