@@ -50,6 +50,11 @@ export class RunRequirementIntelligenceAgentHandler
       capability: 'requirement-intelligence',
       agentKey: 'requirement-intelligence-agent',
       organizationId: command.organizationId,
+      // Explicit, matching run-deep-requirement-analysis.command.ts: this capability has no
+      // org-level AiProviderConfig/ModuleAiConfig override anywhere, so leaving it unset falls
+      // through to the environment's global AI_DEFAULT_PROVIDER -- which is Anthropic with no
+      // configured key, not the Groq key this project actually has.
+      provider: 'groq',
       variables: { storyTitle: story.title, storyDescription: story.description ?? 'No description provided.' },
       outputSchema: requirementIntelligenceOutputSchema,
     });
