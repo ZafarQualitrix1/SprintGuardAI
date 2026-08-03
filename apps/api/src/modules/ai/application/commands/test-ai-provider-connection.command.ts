@@ -83,6 +83,8 @@ export class TestAiProviderConnectionHandler
         return 'gpt-4o-mini';
       case 'anthropic':
         return 'claude-sonnet-5';
+      case 'openrouter':
+        return 'openai/gpt-4o-mini';
       default:
         return 'default';
     }

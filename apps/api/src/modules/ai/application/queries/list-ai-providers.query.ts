@@ -34,7 +34,7 @@ const KNOWN_PROVIDERS: Array<{ provider: string; displayName: string; supported:
   { provider: 'anthropic', displayName: 'Claude (Anthropic)', supported: true },
   { provider: 'deepseek', displayName: 'DeepSeek', supported: false },
   { provider: 'ollama', displayName: 'Ollama', supported: false },
-  { provider: 'openrouter', displayName: 'OpenRouter', supported: false },
+  { provider: 'openrouter', displayName: 'OpenRouter', supported: true },
 ];
 
 export class ListAiProvidersQuery {

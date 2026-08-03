@@ -42,6 +42,7 @@ export default () => ({
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     openAiApiKey: process.env.OPENAI_API_KEY,
     groqApiKey: process.env.GROQ_API_KEY,
+    openRouterApiKey: process.env.OPENROUTER_API_KEY,
     defaultProvider: process.env.AI_DEFAULT_PROVIDER ?? 'groq',
   },
   observability: {
