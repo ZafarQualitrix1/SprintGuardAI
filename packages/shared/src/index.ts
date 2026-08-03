@@ -13,5 +13,3 @@ export * from './schemas/automation-execution';
 export * from './schemas/release';
 export * from './schemas/ai-settings';
 export * from './schemas/prompt-management';
-export * from './schemas/organization-settings';
-export * from './schemas/admin';
