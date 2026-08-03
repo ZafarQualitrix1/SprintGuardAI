@@ -1,2 +1,2 @@
 ﻿// Repository interfaces (ports) owned by the Domain layer.
-export {};
+export * from './audit-log.repository.interface';

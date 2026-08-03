@@ -1,2 +1,3 @@
 // TanStack Query hooks (useQuery/useMutation) calling apiClient for the 'admin' feature.
-export {};
+export * from './admin.api';
+export * from './use-admin';

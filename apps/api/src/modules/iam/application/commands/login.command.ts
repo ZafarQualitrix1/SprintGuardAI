@@ -1,5 +1,6 @@
 import { Inject, UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { PrismaService } from '@sprintguard/database';
 import { USER_REPOSITORY, IUserRepository } from '../../domain/repositories';
 import { REFRESH_TOKEN_REPOSITORY, IRefreshTokenRepository } from '../../domain/repositories';
 import { PASSWORD_HASHER, IPasswordHasher } from '../ports/password-hasher.port';
@@ -25,6 +26,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand, AuthSessionRe
     @Inject(PASSWORD_HASHER) private readonly passwordHasher: IPasswordHasher,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
     @Inject(REFRESH_TOKEN_REPOSITORY) private readonly refreshTokenRepository: IRefreshTokenRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(command: LoginCommand): Promise<AuthSessionResult> {
@@ -38,6 +40,19 @@ export class LoginHandler implements ICommandHandler<LoginCommand, AuthSessionRe
     }
 
     const { user, membership } = result;
+
+    // Login history (Organization Settings §Security) reads straight off these two writes --
+    // no separate session/device table needed for the "last login" and "recent logins" views.
+    await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: membership.organizationId,
+        actorId: user.id,
+        action: 'auth.login',
+        targetType: 'User',
+        targetId: user.id,
+      },
+    });
 
     const accessToken = this.tokenService.signAccessToken({
       sub: user.id,

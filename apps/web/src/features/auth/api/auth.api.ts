@@ -1,4 +1,4 @@
-import type { AuthResponse, AuthUser, LoginInput, RegisterInput } from '@sprintguard/shared';
+import type { AcceptInvitationInput, AuthResponse, AuthUser, LoginInput, RegisterInput } from '@sprintguard/shared';
 import { apiClient } from '@/lib/api-client';
 
 // Thin wrappers over apiClient, one per backend endpoint (apps/api/src/modules/iam/presentation/auth.controller.ts).
@@ -8,4 +8,6 @@ export const authApi = {
   login: (input: LoginInput) => apiClient.post<AuthResponse>('/auth/login', input),
   logout: () => apiClient.post<void>('/auth/logout'),
   me: () => apiClient.get<AuthUser>('/auth/me'),
+  acceptInvitation: (input: AcceptInvitationInput) =>
+    apiClient.post<AuthResponse>('/auth/accept-invitation', input),
 };

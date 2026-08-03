@@ -14,6 +14,9 @@ export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  // Server-side is the real enforcement (@RequirePermission on the routes this page calls) --
+  // this only hides the link from users who'd immediately hit a 403 opening it.
+  requiredPermission?: string;
 }
 
 export interface NavSection {
@@ -44,8 +47,13 @@ export const navSections: NavSection[] = [
   {
     title: 'Administration',
     items: [
-      { label: 'Organization Settings', href: '/dashboard/settings/organization', icon: Settings },
-      { label: 'Admin', href: '/dashboard/admin', icon: ShieldCheck },
+      {
+        label: 'Organization Settings',
+        href: '/dashboard/settings/organization',
+        icon: Settings,
+        requiredPermission: 'org:manage',
+      },
+      { label: 'Admin', href: '/dashboard/admin', icon: ShieldCheck, requiredPermission: 'org:manage' },
     ],
   },
 ];

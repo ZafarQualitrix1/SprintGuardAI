@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { IntegrationController } from './presentation/integration.controller';
 import { IntegrationsController } from './presentation/integrations.controller';
 import { InternalIntegrationsController } from './presentation/internal-integrations.controller';
+import { BackgroundJobsModule } from '../background-jobs/background-jobs.module';
 
 import { INTEGRATION_COMMAND_HANDLERS } from './application/commands';
 import { INTEGRATION_QUERY_HANDLERS } from './application/queries';
@@ -19,6 +20,7 @@ import { PrismaIntegrationConnectionRepository } from './infrastructure/reposito
 // Jira is the reference connector implementation; Linear and others register the same way --
 // implement IIntegrationConnector, add to the INTEGRATION_CONNECTORS factory below.
 @Module({
+  imports: [BackgroundJobsModule],
   controllers: [IntegrationController, IntegrationsController, InternalIntegrationsController],
   providers: [
     ...INTEGRATION_COMMAND_HANDLERS,

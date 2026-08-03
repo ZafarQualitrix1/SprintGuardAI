@@ -30,6 +30,10 @@ const PERMISSIONS = [
   { key: 'org:manage', description: 'Manage organization settings and members' },
   { key: 'integration:manage', description: 'Connect and manage external integrations (Jira, Linear, etc.)' },
   { key: 'admin:platform', description: 'Platform-wide administration across organizations' },
+  { key: 'audit:read', description: 'View audit logs' },
+  { key: 'audit:export', description: 'Export audit logs to CSV' },
+  { key: 'feature-flags:manage', description: 'Enable/disable feature flags and org-level overrides' },
+  { key: 'member:manage', description: 'Invite, remove, and change the role of organization members' },
 ] as const;
 
 const ROLES: Record<string, { name: string; permissions: string[] }> = {
@@ -869,10 +873,33 @@ async function main() {
     });
   }
 
+  // Feature Flag catalog (Admin Console "Feature Flags" tab) -- lets a platform admin disable a
+  // module without a deployment. defaultValue is a plain boolean; per-org overrides live in
+  // FeatureFlagOverride, set from the Admin Console UI, not here.
+  const FEATURE_FLAGS = [
+    { key: 'requirement-intelligence', description: 'Requirement Intelligence module' },
+    { key: 'coverage', description: 'Test Coverage module' },
+    { key: 'test-generation', description: 'AI Test Generator module' },
+    { key: 'automation', description: 'Automation code generation module' },
+    { key: 'execution', description: 'Test execution tracking module' },
+    { key: 'release-readiness', description: 'Release Readiness module' },
+    { key: 'analytics', description: 'Analytics dashboard module' },
+    { key: 'prompt-management', description: 'Prompt Management module' },
+    { key: 'ai-agents', description: 'AI Agents (AI Settings Agents tab)' },
+  ];
+
+  for (const flag of FEATURE_FLAGS) {
+    await prisma.featureFlag.upsert({
+      where: { key: flag.key },
+      create: { key: flag.key, description: flag.description, defaultValue: true },
+      update: { description: flag.description },
+    });
+  }
+
   // eslint-disable-next-line no-console
   console.log(
     `Seeded ${PERMISSIONS.length} permissions, ${Object.keys(ROLES).length} roles, ${CONNECTORS.length} connectors, ` +
-      `${MODEL_REGISTRY.length} models, ${AGENTS.length} agents, and ${PROMPTS.length} prompts.`,
+      `${MODEL_REGISTRY.length} models, ${AGENTS.length} agents, ${PROMPTS.length} prompts, and ${FEATURE_FLAGS.length} feature flags.`,
   );
 }
 

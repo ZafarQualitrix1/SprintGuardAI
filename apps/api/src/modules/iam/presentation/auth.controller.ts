@@ -19,11 +19,13 @@ import { RegisterOrganizationCommand } from '../application/commands/register-or
 import { LoginCommand } from '../application/commands/login.command';
 import { RefreshSessionCommand } from '../application/commands/refresh-session.command';
 import { LogoutCommand } from '../application/commands/logout.command';
+import { AcceptInvitationCommand } from '../application/commands/accept-invitation.command';
 import { GetCurrentUserQuery } from '../application/queries/get-current-user.query';
 import { AuthSessionResult } from '../application/commands/auth-session.types';
 import { AuthResponseDto } from './dto/auth-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 // Scoped to the refresh endpoint only -- the browser never attaches this cookie to any other
@@ -75,6 +77,19 @@ export class AuthController {
   ): Promise<AuthResponseDto> {
     const session = await this.commandBus.execute<LoginCommand, AuthSessionResult>(
       new LoginCommand(dto.email, dto.password),
+    );
+    this.setRefreshCookie(res, session);
+    return this.toResponse(session);
+  }
+
+  @Public()
+  @Post('accept-invitation')
+  async acceptInvitation(
+    @Body() dto: AcceptInvitationDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponseDto> {
+    const session = await this.commandBus.execute<AcceptInvitationCommand, AuthSessionResult>(
+      new AcceptInvitationCommand(dto.token, dto.fullName, dto.password),
     );
     this.setRefreshCookie(res, session);
     return this.toResponse(session);

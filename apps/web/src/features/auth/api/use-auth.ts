@@ -24,6 +24,13 @@ export function useRegister() {
   });
 }
 
+export function useAcceptInvitation() {
+  return useMutation({
+    mutationFn: authApi.acceptInvitation,
+    onSuccess: applySession,
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -42,6 +42,8 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PlatformSaasModule } from './modules/platform-saas/platform-saas.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { OrganizationSettingsModule } from './modules/organization-settings/organization-settings.module';
+import { BackgroundJobsModule } from './modules/background-jobs/background-jobs.module';
 
 @Module({
   imports: [
@@ -100,6 +102,8 @@ import { PlatformModule } from './modules/platform/platform.module';
     RealtimeModule,
     PlatformSaasModule,
     PlatformModule,
+    OrganizationSettingsModule,
+    BackgroundJobsModule,
   ],
   providers: [
     // Order matters: JwtAuthGuard (AuthN) runs before PermissionsGuard (AuthZ), matching
