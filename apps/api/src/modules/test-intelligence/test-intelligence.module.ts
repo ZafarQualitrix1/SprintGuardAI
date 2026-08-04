@@ -7,10 +7,13 @@ import { TEST_INTELLIGENCE_QUERY_HANDLERS } from './application/queries';
 import { ACCEPTANCE_CRITERION_READ_REPOSITORY } from './domain/repositories/acceptance-criterion-read.repository.interface';
 import { TEST_SCENARIO_REPOSITORY } from './domain/repositories/test-scenario.repository.interface';
 import { TEST_CASE_REPOSITORY } from './domain/repositories/test-case.repository.interface';
+import { STORY_METADATA_READ_REPOSITORY } from './domain/repositories/story-metadata-read.repository.interface';
 
 import { PrismaAcceptanceCriterionReadRepository } from './infrastructure/repositories/prisma-acceptance-criterion-read.repository';
 import { PrismaTestScenarioRepository } from './infrastructure/repositories/prisma-test-scenario.repository';
 import { PrismaTestCaseRepository } from './infrastructure/repositories/prisma-test-case.repository';
+import { PrismaStoryMetadataReadRepository } from './infrastructure/repositories/prisma-story-metadata-read.repository';
+import { TestCaseExportService } from './application/services/test-case-export.service';
 
 // Bounded context module: Test Intelligence (Solution Architecture §6). Imports AiModule for
 // AiOrchestrationService, same shared-service pattern as requirement-intelligence.
@@ -23,6 +26,8 @@ import { PrismaTestCaseRepository } from './infrastructure/repositories/prisma-t
     { provide: ACCEPTANCE_CRITERION_READ_REPOSITORY, useClass: PrismaAcceptanceCriterionReadRepository },
     { provide: TEST_SCENARIO_REPOSITORY, useClass: PrismaTestScenarioRepository },
     { provide: TEST_CASE_REPOSITORY, useClass: PrismaTestCaseRepository },
+    { provide: STORY_METADATA_READ_REPOSITORY, useClass: PrismaStoryMetadataReadRepository },
+    TestCaseExportService,
   ],
   // TEST_SCENARIO_REPOSITORY/TEST_CASE_REPOSITORY exported for ba-review's
   // RegenerateFromFeedbackCommand, which needs direct read+write access to apply a targeted

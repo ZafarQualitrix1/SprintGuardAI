@@ -1,18 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Wand2 } from 'lucide-react';
+import { ChevronDown, Download, Wand2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/empty-state';
-import { useGenerateTestCases, useGenerateTestScenarios, useTestScenarios } from '@/features/test-intelligence/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  testIntelligenceApi,
+  useGenerateTestCases,
+  useGenerateTestScenarios,
+  useTestScenarios,
+} from '@/features/test-intelligence/api';
+import { exportTestCasesToPdf } from '@/features/test-intelligence/lib/export-pdf';
 import { useBaReviewStatus } from '@/features/ba-review/api';
 import { BaReviewStatusBadge } from '@/features/ba-review/components';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { downloadBlob } from '@/lib/download';
 import type { Story, TestCase } from '@sprintguard/shared';
 
 const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'destructive'> = {
@@ -23,7 +36,7 @@ const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'des
 };
 
 interface StoryTestGeneratorCardProps {
-  story: Pick<Story, 'id' | 'title'>;
+  story: Pick<Story, 'id' | 'title' | 'externalId'>;
 }
 
 // Enterprise Test Generation fields don't fit inline without overwhelming an already-dense card --
@@ -104,6 +117,7 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
   const { data: scenarios, isLoading } = useTestScenarios(story.id);
   const generateScenarios = useGenerateTestScenarios(story.id);
   const generateCases = useGenerateTestCases(story.id);
+  const [isExporting, setIsExporting] = useState(false);
   const { data: baStatus } = useBaReviewStatus(story.id);
   // Bug 4: disabled only while a review is actually in flight at the BA in Jira -- see
   // story-requirements-card.tsx for the identical rationale.
@@ -122,6 +136,7 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
       : undefined;
 
   const hasScenarios = Boolean(scenarios?.length);
+  const hasCases = Boolean(scenarios?.some((s) => s.testCases.length > 0));
   const scenariosDisabled = generateScenarios.isPending || lockedOrInFlight;
   const casesDisabled = generateCases.isPending || lockedOrInFlight || !hasScenarios;
   const casesDisabledReason = !hasScenarios ? 'Generate test scenarios first.' : lockedOrInFlightReason;
@@ -152,6 +167,27 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
         }),
     });
 
+  const onExport = async (format: 'xlsx' | 'csv' | 'pdf') => {
+    if (!scenarios) return;
+    setIsExporting(true);
+    try {
+      if (format === 'pdf') {
+        exportTestCasesToPdf(story.title, story.externalId, scenarios);
+      } else {
+        const blob = await testIntelligenceApi.exportTests(story.id, format);
+        downloadBlob(blob, `${story.externalId ?? story.id}-test-cases.${format}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Could not export test cases',
+        description: error instanceof ApiError ? error.message : undefined,
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -178,6 +214,18 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
                 ? 'Regenerate Test Cases'
                 : 'Generate Test Cases'}
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="ghost" disabled={!hasCases || isExporting} title="Export test cases">
+                <Download className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onExport('xlsx')}>Export Excel</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('csv')}>Export CSV</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onExport('pdf')}>Export PDF</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardHeader>
       <CardContent>

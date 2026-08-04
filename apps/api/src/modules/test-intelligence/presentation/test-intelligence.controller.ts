@@ -1,4 +1,5 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
@@ -6,8 +7,12 @@ import { RequirePermission } from '../../../common/decorators/require-permission
 import { RunTestScenarioGenerationCommand } from '../application/commands/run-test-scenario-generation.command';
 import { RunTestCaseGenerationCommand } from '../application/commands/run-test-case-generation.command';
 import { GetTestScenariosByStoryQuery } from '../application/queries/get-test-scenarios-by-story.query';
+import { ExportTestCasesQuery, TestCaseExportResult } from '../application/queries/export-test-cases.query';
+import { TestCaseExportFormat } from '../application/services/test-case-export.service';
 import { TestScenarioEntity } from '../domain/entities/test-artifact.entity';
 import { TestScenarioDto } from './dto/test-artifact.dto';
+
+const EXPORT_FORMATS: TestCaseExportFormat[] = ['xlsx', 'csv'];
 
 function toDto(entity: TestScenarioEntity): TestScenarioDto {
   return {
@@ -57,6 +62,29 @@ export class TestIntelligenceController {
       new GetTestScenariosByStoryQuery(storyId),
     );
     return scenarios.map(toDto);
+  }
+
+  @Get('export')
+  @RequirePermission('test:read')
+  async exportTestCases(
+    @Param('storyId') storyId: string,
+    @Query('format') format: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Buffer | string> {
+    if (!EXPORT_FORMATS.includes(format as TestCaseExportFormat)) {
+      throw new BadRequestException(`format must be one of: ${EXPORT_FORMATS.join(', ')}`);
+    }
+
+    const result = await this.queryBus.execute<ExportTestCasesQuery, TestCaseExportResult>(
+      new ExportTestCasesQuery(user.organizationId, storyId, format as TestCaseExportFormat),
+    );
+
+    res.set({
+      'Content-Type': result.contentType,
+      'Content-Disposition': `attachment; filename="${result.filename}"`,
+    });
+    return result.body;
   }
 
   @Post('generate-scenarios')
