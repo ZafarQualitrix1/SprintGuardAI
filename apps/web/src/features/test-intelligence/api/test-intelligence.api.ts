@@ -3,5 +3,7 @@ import { apiClient } from '@/lib/api-client';
 
 export const testIntelligenceApi = {
   listByStory: (storyId: string) => apiClient.get<TestScenario[]>(`/stories/${storyId}/tests`),
-  generate: (storyId: string) => apiClient.post<TestScenario[]>(`/stories/${storyId}/tests/generate`),
+  generateScenarios: (storyId: string) =>
+    apiClient.post<TestScenario[]>(`/stories/${storyId}/tests/generate-scenarios`),
+  generateCases: (storyId: string) => apiClient.post<TestScenario[]>(`/stories/${storyId}/tests/generate-cases`),
 };

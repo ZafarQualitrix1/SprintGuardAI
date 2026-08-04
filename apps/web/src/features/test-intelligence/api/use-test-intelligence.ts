@@ -10,10 +10,20 @@ export function useTestScenarios(storyId: string) {
   });
 }
 
-export function useGenerateTests(storyId: string) {
+export function useGenerateTestScenarios(storyId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => testIntelligenceApi.generate(storyId),
+    mutationFn: () => testIntelligenceApi.generateScenarios(storyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['test-intelligence', storyId] });
+    },
+  });
+}
+
+export function useGenerateTestCases(storyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => testIntelligenceApi.generateCases(storyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-intelligence', storyId] });
       // Bug 3: Coverage must refresh automatically whenever Test Generation changes.

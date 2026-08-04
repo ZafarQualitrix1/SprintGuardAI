@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/empty-state';
-import { useGenerateTests, useTestScenarios } from '@/features/test-intelligence/api';
+import { useGenerateTestCases, useGenerateTestScenarios, useTestScenarios } from '@/features/test-intelligence/api';
 import { useBaReviewStatus } from '@/features/ba-review/api';
 import { BaReviewStatusBadge } from '@/features/ba-review/components';
 import { ApiError } from '@/lib/api-client';
@@ -102,7 +102,8 @@ function TestCaseDetails({ testCase }: { testCase: TestCase }) {
 
 export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
   const { data: scenarios, isLoading } = useTestScenarios(story.id);
-  const generate = useGenerateTests(story.id);
+  const generateScenarios = useGenerateTestScenarios(story.id);
+  const generateCases = useGenerateTestCases(story.id);
   const { data: baStatus } = useBaReviewStatus(story.id);
   // Bug 4: disabled only while a review is actually in flight at the BA in Jira -- see
   // story-requirements-card.tsx for the identical rationale.
@@ -113,20 +114,40 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
         baStatus.status === 'REGENERATION_IN_PROGRESS'),
   );
   const isLocked = baStatus?.isLocked ?? false;
-  const disabled = generate.isPending || isLocked || reviewInFlight;
-  const disabledReason = isLocked
+  const lockedOrInFlight = isLocked || reviewInFlight;
+  const lockedOrInFlightReason = isLocked
     ? 'Test cases for this story are BA-approved and locked. An Admin must unlock it first.'
     : reviewInFlight
       ? 'A BA review is in progress for this story. Generate is disabled until it is approved.'
       : undefined;
 
-  const onGenerate = () =>
-    generate.mutate(undefined, {
-      onSuccess: (result) => toast({ title: 'Tests generated', description: `${result.length} scenarios generated` }),
+  const hasScenarios = Boolean(scenarios?.length);
+  const scenariosDisabled = generateScenarios.isPending || lockedOrInFlight;
+  const casesDisabled = generateCases.isPending || lockedOrInFlight || !hasScenarios;
+  const casesDisabledReason = !hasScenarios ? 'Generate test scenarios first.' : lockedOrInFlightReason;
+
+  const onGenerateScenarios = () =>
+    generateScenarios.mutate(undefined, {
+      onSuccess: (result) =>
+        toast({ title: 'Test scenarios generated', description: `${result.length} scenarios generated` }),
       onError: (error) =>
         toast({
           variant: 'destructive',
-          title: 'Could not generate tests',
+          title: 'Could not generate test scenarios',
+          description: error instanceof ApiError ? error.message : undefined,
+        }),
+    });
+
+  const onGenerateCases = () =>
+    generateCases.mutate(undefined, {
+      onSuccess: (result) => {
+        const caseCount = result.reduce((sum, scenario) => sum + scenario.testCases.length, 0);
+        toast({ title: 'Test cases generated', description: `${caseCount} test cases generated` });
+      },
+      onError: (error) =>
+        toast({
+          variant: 'destructive',
+          title: 'Could not generate test cases',
           description: error instanceof ApiError ? error.message : undefined,
         }),
     });
@@ -138,17 +159,40 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
           <CardTitle className="text-base">{story.title}</CardTitle>
           {baStatus ? <BaReviewStatusBadge status={baStatus.status} reviewCycleCount={baStatus.reviewCycleCount} /> : null}
         </div>
-        <Button size="sm" onClick={onGenerate} disabled={disabled} title={disabledReason}>
-          <Wand2 className="mr-2 h-4 w-4" />
-          {generate.isPending ? 'Generating…' : scenarios?.length ? 'Regenerate tests' : 'Generate tests'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onGenerateScenarios}
+            disabled={scenariosDisabled}
+            title={lockedOrInFlightReason}
+          >
+            <Wand2 className="mr-2 h-4 w-4" />
+            {generateScenarios.isPending ? 'Generating…' : hasScenarios ? 'Regenerate Test Scenarios' : 'Generate Test Scenarios'}
+          </Button>
+          <Button size="sm" onClick={onGenerateCases} disabled={casesDisabled} title={casesDisabledReason}>
+            <Wand2 className="mr-2 h-4 w-4" />
+            {generateCases.isPending
+              ? 'Generating…'
+              : scenarios?.some((s) => s.testCases.length > 0)
+                ? 'Regenerate Test Cases'
+                : 'Generate Test Cases'}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
-        {generate.isError ? (
+        {generateScenarios.isError ? (
           <p className="mb-3 text-sm text-destructive">
-            {generate.error instanceof ApiError
-              ? generate.error.message
-              : 'Could not generate tests for this story.'}
+            {generateScenarios.error instanceof ApiError
+              ? generateScenarios.error.message
+              : 'Could not generate test scenarios for this story.'}
+          </p>
+        ) : null}
+        {generateCases.isError ? (
+          <p className="mb-3 text-sm text-destructive">
+            {generateCases.error instanceof ApiError
+              ? generateCases.error.message
+              : 'Could not generate test cases for this story.'}
           </p>
         ) : null}
 
@@ -158,7 +202,7 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
           <EmptyState
             icon={Wand2}
             title="No test scenarios yet"
-            description="Requires Requirement Intelligence to have run for this story first, then generates test scenarios and cases from its acceptance criteria."
+            description="Click Generate Test Scenarios to derive high-level scenarios from this story's acceptance criteria, then Generate Test Cases to expand them into executable steps."
           />
         ) : (
           <div className="space-y-4">

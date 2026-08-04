@@ -3,7 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
-import { RunTestGenerationCommand } from '../application/commands/run-test-generation.command';
+import { RunTestScenarioGenerationCommand } from '../application/commands/run-test-scenario-generation.command';
+import { RunTestCaseGenerationCommand } from '../application/commands/run-test-case-generation.command';
 import { GetTestScenariosByStoryQuery } from '../application/queries/get-test-scenarios-by-story.query';
 import { TestScenarioEntity } from '../domain/entities/test-artifact.entity';
 import { TestScenarioDto } from './dto/test-artifact.dto';
@@ -58,15 +59,28 @@ export class TestIntelligenceController {
     return scenarios.map(toDto);
   }
 
-  @Post('generate')
+  @Post('generate-scenarios')
   @HttpCode(HttpStatus.CREATED)
   @RequirePermission('test:write')
-  async generate(
+  async generateScenarios(
     @Param('storyId') storyId: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<TestScenarioDto[]> {
-    const scenarios = await this.commandBus.execute<RunTestGenerationCommand, TestScenarioEntity[]>(
-      new RunTestGenerationCommand(user.organizationId, storyId, user.userId),
+    const scenarios = await this.commandBus.execute<RunTestScenarioGenerationCommand, TestScenarioEntity[]>(
+      new RunTestScenarioGenerationCommand(user.organizationId, storyId, user.userId),
+    );
+    return scenarios.map(toDto);
+  }
+
+  @Post('generate-cases')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermission('test:write')
+  async generateCases(
+    @Param('storyId') storyId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TestScenarioDto[]> {
+    const scenarios = await this.commandBus.execute<RunTestCaseGenerationCommand, TestScenarioEntity[]>(
+      new RunTestCaseGenerationCommand(user.organizationId, storyId, user.userId),
     );
     return scenarios.map(toDto);
   }

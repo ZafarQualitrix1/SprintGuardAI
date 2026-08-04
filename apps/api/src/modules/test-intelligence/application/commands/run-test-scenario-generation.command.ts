@@ -2,8 +2,6 @@ import { BadRequestException, ForbiddenException, Inject, Logger } from '@nestjs
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
-import { TriggerBaReviewCommand } from '../../../ba-review/application/commands/trigger-ba-review.command';
-import { TestCaseSnapshotEntry } from '../../../ba-review/domain/entities/ba-review-cycle.entity';
 import {
   ACCEPTANCE_CRITERION_READ_REPOSITORY,
   IAcceptanceCriterionReadRepository,
@@ -12,15 +10,14 @@ import {
   TEST_SCENARIO_REPOSITORY,
   ITestScenarioRepository,
 } from '../../domain/repositories/test-scenario.repository.interface';
-import {
-  TEST_CASE_REPOSITORY,
-  ITestCaseRepository,
-} from '../../domain/repositories/test-case.repository.interface';
 import { TestScenarioEntity } from '../../domain/entities/test-artifact.entity';
-import { testCaseOutputSchema, testScenarioOutputSchema } from '../schemas/test-generation.schema';
+import { testScenarioOutputSchema } from '../schemas/test-generation.schema';
 import { RunRequirementIntelligenceAgentCommand } from '../../../requirement-intelligence/application/commands/run-requirement-intelligence-agent.command';
 
-export class RunTestGenerationCommand {
+// "Generate Test Scenarios" -- high-level scenarios only (no step-by-step test cases). Split from
+// the combined RunTestGenerationCommand so a user can generate/review scenarios independently
+// before committing to full test-case generation.
+export class RunTestScenarioGenerationCommand {
   constructor(
     public readonly organizationId: string,
     public readonly storyId: string,
@@ -28,21 +25,22 @@ export class RunTestGenerationCommand {
   ) {}
 }
 
-@CommandHandler(RunTestGenerationCommand)
-export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerationCommand, TestScenarioEntity[]> {
-  private readonly logger = new Logger(RunTestGenerationHandler.name);
+@CommandHandler(RunTestScenarioGenerationCommand)
+export class RunTestScenarioGenerationHandler
+  implements ICommandHandler<RunTestScenarioGenerationCommand, TestScenarioEntity[]>
+{
+  private readonly logger = new Logger(RunTestScenarioGenerationHandler.name);
 
   constructor(
     @Inject(ACCEPTANCE_CRITERION_READ_REPOSITORY)
     private readonly acceptanceCriterionReadRepository: IAcceptanceCriterionReadRepository,
     @Inject(TEST_SCENARIO_REPOSITORY) private readonly testScenarioRepository: ITestScenarioRepository,
-    @Inject(TEST_CASE_REPOSITORY) private readonly testCaseRepository: ITestCaseRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
   ) {}
 
-  async execute(command: RunTestGenerationCommand): Promise<TestScenarioEntity[]> {
+  async execute(command: RunTestScenarioGenerationCommand): Promise<TestScenarioEntity[]> {
     const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
       new IsStoryLockedQuery(command.organizationId, command.storyId),
     );
@@ -64,7 +62,7 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
     // since that's the exact same pipeline "Analyze story" already uses.
     if (acceptanceCriteria.length === 0) {
       this.logger.log(
-        `No acceptance criteria for story ${command.storyId} -- inferring from description via Requirement Intelligence before generating tests.`,
+        `No acceptance criteria for story ${command.storyId} -- inferring from description via Requirement Intelligence before generating scenarios.`,
       );
       await this.commandBus.execute(
         new RunRequirementIntelligenceAgentCommand(command.organizationId, command.storyId),
@@ -84,10 +82,6 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
     // Sequential, not parallel: bounds concurrent load on the configured LLM provider and keeps
     // AgentRun ordering easy to follow in the audit trail. A story typically has a handful of ACs,
     // so this is an acceptable latency trade-off for MVP scope.
-    let lastProvider = '';
-    let lastModel = '';
-    let lastPromptVersion = '';
-
     for (const ac of acceptanceCriteria) {
       // Explicit: capabilities without a provider fall through to the deployment's
       // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
@@ -101,77 +95,9 @@ export class RunTestGenerationHandler implements ICommandHandler<RunTestGenerati
         outputSchema: testScenarioOutputSchema,
       });
 
-      const scenarios = await this.testScenarioRepository.replaceForAcceptanceCriterion(
-        ac.id,
-        ac.storyId,
-        scenarioResult.data.scenarios,
-      );
-
-      for (const scenario of scenarios) {
-        const caseResult = await this.aiOrchestrationService.execute({
-          capability: 'test-case',
-          agentKey: 'test-case-agent',
-          organizationId: command.organizationId,
-          provider: 'groq',
-          variables: {
-            scenarioTitle: scenario.title,
-            scenarioDescription: scenario.description ?? 'No additional description.',
-          },
-          outputSchema: testCaseOutputSchema,
-        });
-
-        await this.testCaseRepository.replaceForScenario(scenario.id, command.storyId, caseResult.data.cases);
-        lastProvider = caseResult.provider;
-        lastModel = caseResult.model;
-        lastPromptVersion = caseResult.promptVersion;
-      }
+      await this.testScenarioRepository.replaceForAcceptanceCriterion(ac.id, ac.storyId, scenarioResult.data.scenarios);
     }
 
-    const finalScenarios = await this.testScenarioRepository.findByStoryId(command.storyId);
-
-    // BA Review Workflow: every fresh generation must be submitted for mandatory BA approval.
-    // Fire-and-forget -- Jira comment/attachment posting is a slower, network-flaky side effect
-    // that must never make this command's caller (the "Generate tests" HTTP request) fail or hang.
-    if (finalScenarios.length > 0) {
-      const testCasesSnapshot: TestCaseSnapshotEntry[] = finalScenarios.map((scenario) => ({
-        scenarioId: scenario.id,
-        scenarioTitle: scenario.title,
-        testCases: scenario.testCases.map((testCase) => ({
-          id: testCase.id,
-          title: testCase.title,
-          description: testCase.description,
-          steps: testCase.steps,
-          priority: testCase.priority,
-          severity: testCase.severity,
-          testType: testCase.testType,
-          automationStatus: testCase.automationStatus,
-          displayId: testCase.displayId,
-          testObjective: testCase.testObjective,
-          preconditions: testCase.preconditions,
-          dependencies: testCase.dependencies,
-          requestMethod: testCase.requestMethod,
-          requestPayload: testCase.requestPayload,
-          expectedStatusCode: testCase.expectedStatusCode,
-          expectedResponse: testCase.expectedResponse,
-          remarks: testCase.remarks,
-        })),
-      }));
-
-      this.commandBus
-        .execute(
-          new TriggerBaReviewCommand(
-            command.organizationId,
-            command.storyId,
-            command.actorId,
-            testCasesSnapshot,
-            lastProvider,
-            lastModel,
-            lastPromptVersion,
-          ),
-        )
-        .catch((error) => this.logger.warn(`BA review submission failed for story ${command.storyId}: ${error}`));
-    }
-
-    return finalScenarios;
+    return this.testScenarioRepository.findByStoryId(command.storyId);
   }
 }
