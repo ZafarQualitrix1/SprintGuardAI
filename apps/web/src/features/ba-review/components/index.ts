@@ -5,3 +5,5 @@ export * from './review-timeline';
 export * from './admin-unlock-dialog';
 export * from './sync-status-indicator';
 export * from './ba-assignment-field';
+export * from './jira-user-picker';
+export * from './submit-for-review-dialog';

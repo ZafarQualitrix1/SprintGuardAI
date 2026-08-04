@@ -18,6 +18,7 @@ import {
 import { BaAssignmentField } from './ba-assignment-field';
 import { SyncStatusIndicator } from './sync-status-indicator';
 import { AdminUnlockDialog } from './admin-unlock-dialog';
+import { SubmitForReviewDialog } from './submit-for-review-dialog';
 
 const STATUS_LABEL: Record<string, string> = {
   PENDING_REVIEW: 'Pending Review',
@@ -37,6 +38,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'warning' | 'succ
 
 interface BaReviewStatusPanelProps {
   storyId: string;
+  storyTitle: string;
   canApprove: boolean;
   canAdminUnlock: boolean;
 }
@@ -45,13 +47,14 @@ interface BaReviewStatusPanelProps {
 // Reviewer, Last Review Time, Number of Review Cycles, Approval Progress, Locked Status -- plus
 // the approve/request-changes actions and BA assignment/sync-status affordances live here too,
 // since they're all facets of the same governance surface.
-export function BaReviewStatusPanel({ storyId, canApprove, canAdminUnlock }: BaReviewStatusPanelProps) {
+export function BaReviewStatusPanel({ storyId, storyTitle, canApprove, canAdminUnlock }: BaReviewStatusPanelProps) {
   const { data: status, isLoading } = useBaReviewStatus(storyId);
   const approve = useApproveReviewCycle(storyId);
   const requestChanges = useRequestChanges(storyId);
   const syncNow = useSyncBaReviewNow(storyId);
   const [approvalComment, setApprovalComment] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   if (isLoading || !status) {
     return (
@@ -115,7 +118,14 @@ export function BaReviewStatusPanel({ storyId, canApprove, canAdminUnlock }: BaR
         <CardTitle className="flex items-center gap-2 text-base">
           <ShieldCheck className="h-4 w-4" /> BA Review Status
         </CardTitle>
-        <SyncStatusIndicator storyId={storyId} onSyncNow={onSyncNow} isSyncing={syncNow.isPending} />
+        <div className="flex items-center gap-2">
+          {!status.isLocked && status.activeCycle ? (
+            <Button size="sm" variant="outline" onClick={() => setSubmitDialogOpen(true)}>
+              Submit for Review
+            </Button>
+          ) : null}
+          <SyncStatusIndicator storyId={storyId} onSyncNow={onSyncNow} isSyncing={syncNow.isPending} />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
@@ -179,6 +189,12 @@ export function BaReviewStatusPanel({ storyId, canApprove, canAdminUnlock }: BaR
           </div>
         ) : null}
       </CardContent>
+      <SubmitForReviewDialog
+        storyId={storyId}
+        storyTitle={storyTitle}
+        open={submitDialogOpen}
+        onOpenChange={setSubmitDialogOpen}
+      />
     </Card>
   );
 }

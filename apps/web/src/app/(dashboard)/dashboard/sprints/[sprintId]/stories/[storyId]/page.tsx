@@ -64,7 +64,12 @@ export default function StoryDetailPage() {
           <StoryTestGeneratorCard story={story} />
         </div>
         <div className="space-y-4">
-          <BaReviewStatusPanel storyId={story.id} canApprove={canApprove} canAdminUnlock={canAdminUnlock} />
+          <BaReviewStatusPanel
+            storyId={story.id}
+            storyTitle={story.title}
+            canApprove={canApprove}
+            canAdminUnlock={canAdminUnlock}
+          />
           <ReviewTimeline storyId={story.id} />
         </div>
       </div>

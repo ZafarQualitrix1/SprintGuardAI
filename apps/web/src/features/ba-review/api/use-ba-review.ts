@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { baReviewApi } from './ba-review.api';
+import { baReviewApi, type SubmitForReviewInput } from './ba-review.api';
 
 const statusKey = (storyId: string) => ['ba-review', 'status', storyId];
 const timelineKey = (storyId: string) => ['ba-review', 'timeline', storyId];
@@ -68,6 +68,31 @@ export function useSyncBaReviewNow(storyId: string) {
   const invalidate = useInvalidateBaReview(storyId);
   return useMutation({
     mutationFn: () => baReviewApi.syncNow(storyId),
+    onSuccess: invalidate,
+  });
+}
+
+// Debounced by the caller (use-jira-user-search.ts) via `enabled` + a delayed query key, not here.
+export function useJiraUserSearch(storyId: string, query: string) {
+  return useQuery({
+    queryKey: ['ba-review', 'jira-users', storyId, query],
+    queryFn: () => baReviewApi.searchJiraUsers(storyId, query),
+    enabled: query.trim().length >= 2,
+  });
+}
+
+export function useSubmissionDraft(storyId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['ba-review', 'submission-draft', storyId],
+    queryFn: () => baReviewApi.getSubmissionDraft(storyId),
+    enabled,
+  });
+}
+
+export function useSubmitForReview(storyId: string) {
+  const invalidate = useInvalidateBaReview(storyId);
+  return useMutation({
+    mutationFn: (input: SubmitForReviewInput) => baReviewApi.submitForReview(storyId, input),
     onSuccess: invalidate,
   });
 }

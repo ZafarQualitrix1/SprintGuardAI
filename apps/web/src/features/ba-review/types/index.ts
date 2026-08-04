@@ -65,3 +65,9 @@ export interface BaReviewSyncLog {
   errorMessage: string | null;
   createdAt: string;
 }
+
+export interface JiraUserMatch {
+  accountId: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
