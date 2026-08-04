@@ -1,4 +1,21 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
@@ -10,11 +27,13 @@ import { SearchExternalUsersQuery } from '../../integration/application/queries/
 import { GetBaReviewStatusQuery, BaReviewStatusResult } from '../application/queries/get-ba-review-status.query';
 import { GetReviewTimelineQuery } from '../application/queries/get-review-timeline.query';
 import { GetBaReviewSyncLogsQuery } from '../application/queries/get-ba-review-sync-logs.query';
+import { GetSubmissionDraftQuery } from '../application/queries/get-submission-draft.query';
 import { ApproveReviewCycleCommand } from '../application/commands/approve-review-cycle.command';
 import { ProcessBaReplyCommand } from '../application/commands/process-ba-reply.command';
 import { AdminUnlockStoryCommand } from '../application/commands/admin-unlock-story.command';
 import { UpdateBaAssignmentCommand } from '../application/commands/update-ba-assignment.command';
 import { SyncBaReviewThreadsCommand, SyncBaReviewThreadsResult } from '../application/commands/sync-ba-review-threads.command';
+import { SubmitForReviewCommand } from '../application/commands/submit-for-review.command';
 import {
   STORY_CONTEXT_READ_REPOSITORY,
   IStoryContextReadRepository,
@@ -27,8 +46,17 @@ import {
   BaReviewStatusDto,
   BaReviewSyncLogDto,
   RequestChangesDto,
+  SubmitForReviewDto,
   UpdateBaAssignmentDto,
 } from './dto/ba-review.dto';
+
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'text/csv',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+]);
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 function toCycleDto(entity: BaReviewCycleEntity): BaReviewCycleDto {
   return {
@@ -145,6 +173,62 @@ export class BaReviewController {
     }
     return this.queryBus.execute<SearchExternalUsersQuery, ExternalUserMatch[]>(
       new SearchExternalUsersQuery(user.organizationId, story.sourceConnectionId, searchQuery),
+    );
+  }
+
+  @Get('submission-draft')
+  @RequirePermission('test:write')
+  async getSubmissionDraft(
+    @Param('storyId') storyId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ summary: string }> {
+    return this.queryBus.execute<GetSubmissionDraftQuery, { summary: string }>(
+      new GetSubmissionDraftQuery(user.organizationId, storyId),
+    );
+  }
+
+  @Post('submit')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('test:write')
+  @UseInterceptors(
+    FileInterceptor('attachment', { storage: memoryStorage(), limits: { fileSize: MAX_ATTACHMENT_BYTES } }),
+  )
+  async submitForReview(
+    @Param('storyId') storyId: string,
+    @Body() body: SubmitForReviewDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ commentId: string; attachmentId: string | null }> {
+    if (!body.mentionAccountId || !body.mentionDisplayName) {
+      throw new BadRequestException('A BA to mention is required.');
+    }
+    if (!body.summary || body.summary.trim().length === 0) {
+      throw new BadRequestException('Summary is required.');
+    }
+    if (file && !ALLOWED_ATTACHMENT_MIME_TYPES.has(file.mimetype)) {
+      throw new BadRequestException('Attachment must be an Excel, CSV, PDF, or Word document.');
+    }
+
+    let ccMentions: { accountId: string; displayName: string }[] = [];
+    if (body.ccMentions) {
+      try {
+        ccMentions = JSON.parse(body.ccMentions);
+      } catch {
+        throw new BadRequestException('ccMentions must be a JSON array.');
+      }
+    }
+
+    return this.commandBus.execute(
+      new SubmitForReviewCommand(
+        user.organizationId,
+        storyId,
+        user.userId,
+        { accountId: body.mentionAccountId, displayName: body.mentionDisplayName },
+        ccMentions,
+        body.summary,
+        body.comment ?? null,
+        file ? { buffer: file.buffer, filename: file.originalname } : null,
+      ),
     );
   }
 

@@ -65,3 +65,13 @@ export interface AdminUnlockDto {
 export interface UpdateBaAssignmentDto {
   assignedBaEmail: string | null;
 }
+
+// Submitted as multipart/form-data (the optional attachment requires it) -- ccMentions arrives as
+// a JSON-stringified array since multipart fields are otherwise plain strings.
+export interface SubmitForReviewDto {
+  mentionAccountId: string;
+  mentionDisplayName: string;
+  ccMentions?: string;
+  summary: string;
+  comment?: string;
+}

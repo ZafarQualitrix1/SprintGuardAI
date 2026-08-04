@@ -6,6 +6,7 @@ export * from './regenerate-from-feedback.command';
 export * from './approve-review-cycle.command';
 export * from './admin-unlock-story.command';
 export * from './update-ba-assignment.command';
+export * from './submit-for-review.command';
 
 import { TriggerBaReviewHandler } from './trigger-ba-review.command';
 import { SyncBaReviewThreadsHandler } from './sync-ba-review-threads.command';
@@ -14,6 +15,7 @@ import { RegenerateFromFeedbackHandler } from './regenerate-from-feedback.comman
 import { ApproveReviewCycleHandler } from './approve-review-cycle.command';
 import { AdminUnlockStoryHandler } from './admin-unlock-story.command';
 import { UpdateBaAssignmentHandler } from './update-ba-assignment.command';
+import { SubmitForReviewHandler } from './submit-for-review.command';
 
 export const BA_REVIEW_COMMAND_HANDLERS = [
   TriggerBaReviewHandler,
@@ -23,4 +25,5 @@ export const BA_REVIEW_COMMAND_HANDLERS = [
   ApproveReviewCycleHandler,
   AdminUnlockStoryHandler,
   UpdateBaAssignmentHandler,
+  SubmitForReviewHandler,
 ];

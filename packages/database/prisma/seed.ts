@@ -194,6 +194,7 @@ async function main() {
       allowedCapabilities: [
         'requirement-intelligence', 'test-scenario', 'test-case', 'release-readiness-summary', 'coverage-recommendation',
         'deep-requirement-analysis', 'playwright-api-automation', 'playwright-ui-automation', 'test-case-improvement',
+        'ba-review-submission-summary',
       ],
     },
   ] as const;
@@ -276,6 +277,15 @@ async function main() {
         'baseline and returns a targeted add/modify/remove changeset plus an improvement summary.',
       version: '1.0.0',
       capabilities: ['test-case-improvement'],
+    },
+    {
+      key: 'ba-review-submission-summary-agent',
+      name: 'BA Review Submission Summary Agent',
+      description:
+        'Drafts a short, editable summary of a story\'s generated test cases for the Submit for ' +
+        'Review modal, before the user posts it to Jira.',
+      version: '1.0.0',
+      capabilities: ['ba-review-submission-summary'],
     },
   ] as const;
 
@@ -868,6 +878,35 @@ async function main() {
             },
           },
         },
+      },
+    },
+    {
+      capability: 'ba-review-submission-summary',
+      name: 'BA Review Submission Summary',
+      description: 'Drafts a short, editable summary of a story\'s test cases for the Submit for Review modal.',
+      category: 'BA Review Workflow',
+      template: [
+        'You are drafting a short summary for a Business Analyst who is about to review a set of AI-',
+        'generated test cases in Jira. Write 2-4 plain-sentence summary (no markdown, no bullet',
+        'points) covering: what was generated, how many scenarios/test cases, the coverage/',
+        'automation-readiness figures if notable, and a brief note on what the BA should focus their',
+        'review on. Keep it concise and professional -- this is posted directly into a Jira comment.',
+        '',
+        'Story: {{storyTitle}}',
+        'Version: {{documentVersionLabel}}',
+        'Total scenarios: {{totalScenarios}}',
+        'Total test cases: {{totalTestCases}}',
+        'Test case distribution: {{distributionSummary}}',
+        'Requirement coverage: {{coveragePercent}}',
+        'Automation readiness: {{automationReadinessPercent}}',
+        '',
+        'Respond with ONLY valid JSON (no markdown fences, no commentary) matching exactly this shape:',
+        '{"summary":string}',
+      ].join('\n'),
+      jsonSchema: {
+        type: 'object',
+        required: ['summary'],
+        properties: { summary: { type: 'string' } },
       },
     },
   ] as const;
