@@ -9,6 +9,11 @@ name: DB Migrate
 # `master` (i.e. after a reviewed uat->master merge) but is held by the `production` GitHub
 # Environment's required-reviewer rule -- configure that rule in Settings -> Environments
 # (documented in the isolation doc; cannot be set from a workflow file).
+#
+# migrate-uat also reseeds (packages/database/prisma/seed.ts: RBAC roles/permissions, connector
+# catalog, Agent/Model/Prompt registry) after every migration -- upsert-based, so safe to re-run.
+# Without this, a fresh/reset UAT database silently has no Role rows and every registration fails
+# with "RBAC roles are not seeded", same as `docker-compose.yml`'s local migrate-then-seed order.
 
 on:
   push:
@@ -40,6 +45,11 @@ jobs:
 
       - name: Apply pending migrations to SprintGuardAI_UAT
         run: pnpm db:deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Seed RBAC roles/permissions and reference data
+        run: pnpm db:seed
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
