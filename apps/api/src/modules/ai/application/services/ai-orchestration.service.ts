@@ -29,6 +29,30 @@ const SYSTEM_PROMPT =
 // provider/module via ResolvedAiConfig.retryCount when an admin has configured one in AI Settings.
 const DEFAULT_MAX_ATTEMPTS = 2;
 
+// AiProviderConfig.maxOutputTokens is a single org-wide preference per provider, but capabilities
+// have wildly different output sizes -- a value an admin raises so full-file automation generation
+// doesn't get truncated (e.g. 20000) silently gets inherited by every lightweight capability
+// sharing that provider (test-case, test-scenario, ...) too. On tiers with a hard per-minute token
+// ceiling well below that (e.g. Groq's on_demand tier: 12000 TPM total for prompt+completion on
+// llama-3.3-70b-versatile), that single oversized request is rejected outright regardless of how
+// small the actual prompt is -- exactly what happened here. Clamping the effective max_tokens per
+// capability (not the DB value itself) lets an admin's preference still act as an upper bound for
+// capabilities that need it, without breaking every other capability on the same provider.
+const LARGE_OUTPUT_CAPABILITIES = new Set([
+  'playwright-api-automation',
+  'playwright-ui-automation',
+  'deep-requirement-analysis',
+  'test-case-improvement',
+]);
+const DEFAULT_MAX_TOKENS_CEILING = 4096;
+const LARGE_OUTPUT_MAX_TOKENS_CEILING = 8000;
+
+function clampMaxTokens(capability: string, configuredMaxTokens: number | undefined): number | undefined {
+  if (configuredMaxTokens === undefined) return undefined;
+  const ceiling = LARGE_OUTPUT_CAPABILITIES.has(capability) ? LARGE_OUTPUT_MAX_TOKENS_CEILING : DEFAULT_MAX_TOKENS_CEILING;
+  return Math.min(configuredMaxTokens, ceiling);
+}
+
 export interface ExecuteAgentParams<T> {
   capability: string;
   agentKey: string;
@@ -96,14 +120,18 @@ export class AiOrchestrationService {
   async execute<T>(params: ExecuteAgentParams<T>): Promise<ExecuteAgentResult<T>> {
     const correlationId = params.correlationId ?? randomUUID();
 
-    const effective = await this.aiProviderConfigService.resolveEffectiveConfig(
+    const resolved = await this.aiProviderConfigService.resolveEffectiveConfig(
       params.organizationId,
       params.capability,
       params.provider,
     );
     // AiProviderConfigService already falls back to ai.defaultProvider when nothing is configured
     // in the DB -- keeps every unmigrated org working exactly as before this feature existed.
-    const provider = effective.provider;
+    const provider = resolved.provider;
+    const effective: ResolvedAiConfig = {
+      ...resolved,
+      maxTokens: clampMaxTokens(params.capability, resolved.maxTokens),
+    };
 
     const [prompt, agent] = await Promise.all([
       params.promptOverride

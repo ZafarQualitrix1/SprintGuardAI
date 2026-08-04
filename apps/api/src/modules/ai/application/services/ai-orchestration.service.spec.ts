@@ -129,6 +129,46 @@ describe('AiOrchestrationService', () => {
     );
   });
 
+  it('clamps an oversized configured maxTokens down to the capability ceiling before calling the provider', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+    };
+    // A single org-wide maxOutputTokens (e.g. raised for full-file automation generation) must not
+    // reach an unrelated lightweight capability like this one at its full, unclamped value -- on
+    // tiers with a hard per-minute token ceiling below that, an oversized single request is
+    // rejected outright regardless of how small the actual prompt is.
+    const { service } = buildService(provider, { maxTokens: 20000 });
+
+    await service.execute({
+      capability: 'test-capability',
+      agentKey: 'test-agent',
+      organizationId: 'org-1',
+      variables: { name: 'World' },
+      outputSchema,
+    });
+
+    expect(provider.complete.mock.calls[0][0].maxTokens).toBe(4096);
+  });
+
+  it('gives large-output capabilities (e.g. automation generation) a higher clamp ceiling', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+    };
+    const { service } = buildService(provider, { maxTokens: 20000 });
+
+    await service.execute({
+      capability: 'playwright-api-automation',
+      agentKey: 'test-agent',
+      organizationId: 'org-1',
+      variables: { name: 'World' },
+      outputSchema,
+    });
+
+    expect(provider.complete.mock.calls[0][0].maxTokens).toBe(8000);
+  });
+
   it('retries once against the configured fallback provider when the primary exhausts its retries', async () => {
     const primaryProvider: jest.Mocked<IAiProvider> = {
       key: 'groq',
