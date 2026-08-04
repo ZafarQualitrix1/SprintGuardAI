@@ -72,7 +72,14 @@ export interface ExternalIssueLinkPayload {
 export interface ExternalIssueCommentPayload {
   id: string;
   author: string | null;
+  // Author accountId/avatar + raw ADF (BA Review Workflow's real Jira comment-thread mirror) --
+  // `author`/`body` above stay as the pre-existing flattened display strings other callers rely on.
+  authorAccountId: string | null;
+  authorAvatarUrl: string | null;
   body: string;
+  bodyAdf: unknown;
+  mentionedAccountIds: string[];
+  attachmentFilenames: string[];
   createdAt: Date | null;
 }
 

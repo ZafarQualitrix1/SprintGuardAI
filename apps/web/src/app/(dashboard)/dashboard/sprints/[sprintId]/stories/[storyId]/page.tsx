@@ -12,7 +12,7 @@ import { useSprint } from '@/features/sprint/api';
 import { StoryRequirementsCard } from '@/features/requirement-intelligence/components/story-requirements-card';
 import { StoryTestGeneratorCard } from '@/features/test-intelligence/components/story-test-generator-card';
 import { useBaReviewStatus } from '@/features/ba-review/api';
-import { BaReviewStatusPanel, LockBadge, ReviewTimeline } from '@/features/ba-review/components';
+import { BaReviewStatusPanel, LockBadge, ReviewCommentThread, ReviewTimeline } from '@/features/ba-review/components';
 
 // The real per-story detail page -- previously a "Coming soon" stub. Brings together the existing
 // Requirements/Test Generator cards with the BA Review Workflow's governance panels (Status,
@@ -71,6 +71,7 @@ export default function StoryDetailPage() {
             canAdminUnlock={canAdminUnlock}
           />
           <ReviewTimeline storyId={story.id} />
+          <ReviewCommentThread storyId={story.id} />
         </div>
       </div>
     </div>

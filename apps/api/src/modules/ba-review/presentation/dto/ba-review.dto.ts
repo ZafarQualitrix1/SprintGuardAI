@@ -75,3 +75,17 @@ export interface SubmitForReviewDto {
   summary: string;
   comment?: string;
 }
+
+export interface BaReviewJiraCommentDto {
+  id: string;
+  jiraCommentId: string;
+  authorDisplayName: string | null;
+  authorAccountId: string | null;
+  authorAvatarUrl: string | null;
+  bodyText: string;
+  mentionedAccountIds: string[];
+  attachmentFilenames: string[];
+  isOwnComment: boolean;
+  classifiedAs: 'APPROVAL' | 'FEEDBACK' | null;
+  jiraCreatedAt: string | null;
+}

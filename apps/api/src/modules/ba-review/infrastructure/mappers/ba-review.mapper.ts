@@ -1,4 +1,4 @@
-import { StoryBaReviewState as PrismaStoryBaReviewState, BaReviewCycle as PrismaBaReviewCycle, BaReviewSyncLog as PrismaBaReviewSyncLog } from '@sprintguard/database';
+import { StoryBaReviewState as PrismaStoryBaReviewState, BaReviewCycle as PrismaBaReviewCycle, BaReviewSyncLog as PrismaBaReviewSyncLog, BaReviewJiraComment as PrismaBaReviewJiraComment } from '@sprintguard/database';
 import { StoryBaReviewStateEntity } from '../../domain/entities/story-ba-review-state.entity';
 import {
   BaReviewCycleEntity,
@@ -7,6 +7,7 @@ import {
   TestCaseSnapshotEntry,
 } from '../../domain/entities/ba-review-cycle.entity';
 import { BaReviewSyncLogEntity } from '../../domain/entities/ba-review-sync-log.entity';
+import { BaReviewCommentClassification, BaReviewJiraCommentEntity } from '../../domain/entities/ba-review-jira-comment.entity';
 
 export function toStoryBaReviewStateEntity(row: PrismaStoryBaReviewState): StoryBaReviewStateEntity {
   return new StoryBaReviewStateEntity(
@@ -79,6 +80,26 @@ export function toBaReviewSyncLogEntity(row: PrismaBaReviewSyncLog): BaReviewSyn
     row.status,
     row.attempt,
     row.errorMessage,
+    row.createdAt,
+  );
+}
+
+export function toBaReviewJiraCommentEntity(row: PrismaBaReviewJiraComment): BaReviewJiraCommentEntity {
+  return new BaReviewJiraCommentEntity(
+    row.id,
+    row.storyId,
+    row.organizationId,
+    row.jiraCommentId,
+    row.authorDisplayName,
+    row.authorAccountId,
+    row.authorAvatarUrl,
+    row.bodyAdf,
+    row.bodyText,
+    (row.mentionedAccountIds as unknown as string[] | null) ?? [],
+    (row.attachmentFilenames as unknown as string[] | null) ?? [],
+    row.isOwnComment,
+    row.classifiedAs as BaReviewCommentClassification | null,
+    row.jiraCreatedAt,
     row.createdAt,
   );
 }

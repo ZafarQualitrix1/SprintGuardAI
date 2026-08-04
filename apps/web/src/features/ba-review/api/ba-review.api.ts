@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api-client';
-import type { BaReviewCycle, BaReviewStatusSummary, BaReviewSyncLog, JiraUserMatch } from '../types';
+import type { BaReviewCycle, BaReviewJiraComment, BaReviewStatusSummary, BaReviewSyncLog, JiraUserMatch } from '../types';
 
 export interface SubmitForReviewInput {
   mentionAccountId: string;
@@ -14,6 +14,8 @@ export const baReviewApi = {
   getStatus: (storyId: string) => apiClient.get<BaReviewStatusSummary>(`/stories/${storyId}/ba-review`),
   getTimeline: (storyId: string) => apiClient.get<BaReviewCycle[]>(`/stories/${storyId}/ba-review/timeline`),
   getSyncLogs: (storyId: string) => apiClient.get<BaReviewSyncLog[]>(`/stories/${storyId}/ba-review/sync-logs`),
+  getCommentThread: (storyId: string) =>
+    apiClient.get<BaReviewJiraComment[]>(`/stories/${storyId}/ba-review/comments`),
   approve: (storyId: string, approvalComment: string) =>
     apiClient.post<BaReviewCycle>(`/stories/${storyId}/ba-review/approve`, { approvalComment }),
   requestChanges: (storyId: string, feedbackText: string) =>

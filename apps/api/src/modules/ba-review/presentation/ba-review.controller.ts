@@ -28,6 +28,7 @@ import { GetBaReviewStatusQuery, BaReviewStatusResult } from '../application/que
 import { GetReviewTimelineQuery } from '../application/queries/get-review-timeline.query';
 import { GetBaReviewSyncLogsQuery } from '../application/queries/get-ba-review-sync-logs.query';
 import { GetSubmissionDraftQuery } from '../application/queries/get-submission-draft.query';
+import { GetReviewCommentThreadQuery } from '../application/queries/get-review-comment-thread.query';
 import { ApproveReviewCycleCommand } from '../application/commands/approve-review-cycle.command';
 import { ProcessBaReplyCommand } from '../application/commands/process-ba-reply.command';
 import { AdminUnlockStoryCommand } from '../application/commands/admin-unlock-story.command';
@@ -39,10 +40,12 @@ import {
   IStoryContextReadRepository,
 } from '../domain/repositories/story-context-read.repository.interface';
 import { BaReviewCycleEntity } from '../domain/entities/ba-review-cycle.entity';
+import { BaReviewJiraCommentEntity } from '../domain/entities/ba-review-jira-comment.entity';
 import {
   AdminUnlockDto,
   ApproveReviewCycleDto,
   BaReviewCycleDto,
+  BaReviewJiraCommentDto,
   BaReviewStatusDto,
   BaReviewSyncLogDto,
   RequestChangesDto,
@@ -82,6 +85,22 @@ function toCycleDto(entity: BaReviewCycleEntity): BaReviewCycleDto {
     approvedBy: entity.approvedBy,
     approvalComment: entity.approvalComment,
     approvedAt: entity.approvedAt?.toISOString() ?? null,
+  };
+}
+
+function toCommentDto(entity: BaReviewJiraCommentEntity): BaReviewJiraCommentDto {
+  return {
+    id: entity.id,
+    jiraCommentId: entity.jiraCommentId,
+    authorDisplayName: entity.authorDisplayName,
+    authorAccountId: entity.authorAccountId,
+    authorAvatarUrl: entity.authorAvatarUrl,
+    bodyText: entity.bodyText,
+    mentionedAccountIds: entity.mentionedAccountIds,
+    attachmentFilenames: entity.attachmentFilenames,
+    isOwnComment: entity.isOwnComment,
+    classifiedAs: entity.classifiedAs,
+    jiraCreatedAt: entity.jiraCreatedAt?.toISOString() ?? null,
   };
 }
 
@@ -152,6 +171,18 @@ export class BaReviewController {
       errorMessage: log.errorMessage,
       createdAt: log.createdAt.toISOString(),
     }));
+  }
+
+  @Get('comments')
+  @RequirePermission('test:read')
+  async getCommentThread(
+    @Param('storyId') storyId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<BaReviewJiraCommentDto[]> {
+    const comments = await this.queryBus.execute<GetReviewCommentThreadQuery, BaReviewJiraCommentEntity[]>(
+      new GetReviewCommentThreadQuery(storyId, user.organizationId),
+    );
+    return comments.map(toCommentDto);
   }
 
   @Get('jira-users')

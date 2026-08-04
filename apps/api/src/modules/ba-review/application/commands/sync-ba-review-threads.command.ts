@@ -18,6 +18,11 @@ import {
   STORY_CONTEXT_READ_REPOSITORY,
   IStoryContextReadRepository,
 } from '../../domain/repositories/story-context-read.repository.interface';
+import {
+  BA_REVIEW_JIRA_COMMENT_REPOSITORY,
+  IBaReviewJiraCommentRepository,
+} from '../../domain/repositories/ba-review-jira-comment.repository.interface';
+import { isApprovalReply } from '../utils/approval-keyword-matcher.util';
 import { ProcessBaReplyCommand } from './process-ba-reply.command';
 
 export class SyncBaReviewThreadsCommand {
@@ -47,6 +52,7 @@ export class SyncBaReviewThreadsHandler implements ICommandHandler<SyncBaReviewT
     @Inject(BA_REVIEW_CYCLE_REPOSITORY) private readonly cycleRepository: IBaReviewCycleRepository,
     @Inject(BA_REVIEW_SYNC_LOG_REPOSITORY) private readonly syncLogRepository: IBaReviewSyncLogRepository,
     @Inject(STORY_CONTEXT_READ_REPOSITORY) private readonly storyContextRepository: IStoryContextReadRepository,
+    @Inject(BA_REVIEW_JIRA_COMMENT_REPOSITORY) private readonly commentRepository: IBaReviewJiraCommentRepository,
     private readonly queryBus: QueryBus,
     private readonly commandBus: CommandBus,
   ) {}
@@ -80,6 +86,33 @@ export class SyncBaReviewThreadsHandler implements ICommandHandler<SyncBaReviewT
           .filter((comment) => !comment.body.includes('SprintGuard AI'))
           .filter((comment) => !processedIds.has(comment.id))
           .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+        const newest = candidates[0];
+
+        // Persist every comment this poll saw (purely additive to the approve/feedback dispatch
+        // logic below) -- the real Jira comment-thread mirror, idempotent per jiraCommentId.
+        // classifiedAs is only ever tagged on the one comment actually dispatched this poll; every
+        // other comment (already-processed replies, SprintGuard's own posts, older thread history)
+        // stays unclassified rather than guessing at a label nothing acted on.
+        await this.commentRepository.upsertMany(
+          state.storyId,
+          state.organizationId,
+          issue.comments.map((comment) => ({
+            jiraCommentId: comment.id,
+            authorDisplayName: comment.author,
+            authorAccountId: comment.authorAccountId,
+            authorAvatarUrl: comment.authorAvatarUrl,
+            bodyAdf: comment.bodyAdf,
+            bodyText: comment.body,
+            mentionedAccountIds: comment.mentionedAccountIds,
+            attachmentFilenames: comment.attachmentFilenames,
+            isOwnComment: comment.body.includes('SprintGuard AI'),
+            classifiedAs:
+              newest && comment.id === newest.id
+                ? (isApprovalReply(comment.body) ? 'APPROVAL' : 'FEEDBACK')
+                : null,
+            jiraCreatedAt: comment.createdAt,
+          })),
+        );
 
         await this.syncLogRepository.record({
           storyId: state.storyId,
@@ -91,7 +124,6 @@ export class SyncBaReviewThreadsHandler implements ICommandHandler<SyncBaReviewT
           errorMessage: null,
         });
 
-        const newest = candidates[0];
         if (newest) {
           repliesFound += 1;
           await this.commandBus.execute(

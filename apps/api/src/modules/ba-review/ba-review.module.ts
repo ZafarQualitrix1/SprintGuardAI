@@ -12,11 +12,13 @@ import { STORY_BA_REVIEW_STATE_REPOSITORY } from './domain/repositories/story-ba
 import { BA_REVIEW_CYCLE_REPOSITORY } from './domain/repositories/ba-review-cycle.repository.interface';
 import { BA_REVIEW_SYNC_LOG_REPOSITORY } from './domain/repositories/ba-review-sync-log.repository.interface';
 import { STORY_CONTEXT_READ_REPOSITORY } from './domain/repositories/story-context-read.repository.interface';
+import { BA_REVIEW_JIRA_COMMENT_REPOSITORY } from './domain/repositories/ba-review-jira-comment.repository.interface';
 
 import { PrismaStoryBaReviewStateRepository } from './infrastructure/repositories/prisma-story-ba-review-state.repository';
 import { PrismaBaReviewCycleRepository } from './infrastructure/repositories/prisma-ba-review-cycle.repository';
 import { PrismaBaReviewSyncLogRepository } from './infrastructure/repositories/prisma-ba-review-sync-log.repository';
 import { PrismaStoryContextReadRepository } from './infrastructure/repositories/prisma-story-context-read.repository';
+import { PrismaBaReviewJiraCommentRepository } from './infrastructure/repositories/prisma-ba-review-jira-comment.repository';
 import { StoryCoverageLookupService } from './infrastructure/services/story-coverage-lookup.service';
 import { DocumentBuilderService } from './application/services/document-builder.service';
 import { ResolveBaAccountService } from './application/services/resolve-ba-account.service';
@@ -40,6 +42,7 @@ import { PostReviewCommentService } from './application/services/post-review-com
     { provide: BA_REVIEW_CYCLE_REPOSITORY, useClass: PrismaBaReviewCycleRepository },
     { provide: BA_REVIEW_SYNC_LOG_REPOSITORY, useClass: PrismaBaReviewSyncLogRepository },
     { provide: STORY_CONTEXT_READ_REPOSITORY, useClass: PrismaStoryContextReadRepository },
+    { provide: BA_REVIEW_JIRA_COMMENT_REPOSITORY, useClass: PrismaBaReviewJiraCommentRepository },
     StoryCoverageLookupService,
     DocumentBuilderService,
     ResolveBaAccountService,

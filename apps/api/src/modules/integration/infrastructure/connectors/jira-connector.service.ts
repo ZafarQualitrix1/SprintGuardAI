@@ -66,6 +66,7 @@ interface JiraAdfNode {
   type?: string;
   text?: string;
   content?: JiraAdfNode[];
+  attrs?: { id?: string; [key: string]: unknown };
 }
 
 interface JiraFieldMeta {
@@ -103,12 +104,13 @@ interface JiraIssueDetailFields {
 
 interface JiraCommentResponse {
   id: string;
-  author?: { displayName?: string };
+  author?: { accountId?: string; displayName?: string; avatarUrls?: Record<string, string> };
   body?: string | JiraAdfNode;
   created?: string;
 }
 
 interface JiraAttachmentResponse {
+  id: string;
   filename: string;
   mimeType?: string;
   size?: number;
@@ -242,6 +244,24 @@ function adfToStructuredText(node: string | JiraAdfNode | null | undefined): str
   walk(node, null);
   flush();
   return lines.length > 0 ? lines.join('\n') : null;
+}
+
+// Real Jira comment-thread mirror: walks a comment's raw ADF for `mention` nodes (attrs.id ==
+// the mentioned user's accountId) and `media` nodes (attrs.id -- for issue attachments dragged
+// into a comment, this equals the attachment's own `id` from fields.attachment, not a separate
+// media-services id) so the mirror can show who was tagged and which files were referenced inline.
+function collectAdfReferences(node: JiraAdfNode | null): { mentionIds: string[]; mediaIds: string[] } {
+  const mentionIds: string[] = [];
+  const mediaIds: string[] = [];
+  if (!node) return { mentionIds, mediaIds };
+
+  const walk = (n: JiraAdfNode) => {
+    if (n.type === 'mention' && n.attrs?.id) mentionIds.push(String(n.attrs.id));
+    if (n.type === 'media' && n.attrs?.id) mediaIds.push(String(n.attrs.id));
+    n.content?.forEach(walk);
+  };
+  walk(node);
+  return { mentionIds, mediaIds };
 }
 
 function toIsoDate(value: string | undefined): Date | null {
@@ -567,13 +587,33 @@ export class JiraConnectorService implements IIntegrationConnector {
       adfToStructuredText((acceptanceCriteriaRaw as string | JiraAdfNode | null) ?? null) ??
       this.extractAcceptanceCriteriaFromDescription(description);
 
+    // Jira comments don't carry their own attachment list -- inline files are `media` ADF nodes
+    // referencing the issue's own attachments, so this map has to be built before the comments can
+    // resolve their mediaIds to filenames.
+    const attachmentFilenameById = new Map<string, string>();
+    (fields.attachment ?? []).forEach((attachment) => {
+      if (attachment.id) attachmentFilenameById.set(attachment.id, attachment.filename);
+    });
+
     const comments: ExternalIssueCommentPayload[] = (fields.comment?.comments ?? [])
-      .map((comment): ExternalIssueCommentPayload => ({
-        id: comment.id,
-        author: comment.author?.displayName ?? null,
-        body: adfToStructuredText(comment.body ?? null) ?? '',
-        createdAt: toIsoDate(comment.created),
-      }))
+      .map((comment): ExternalIssueCommentPayload => {
+        const rawBody = comment.body ?? null;
+        const bodyAdf = typeof rawBody === 'string' ? null : rawBody;
+        const { mentionIds, mediaIds } = collectAdfReferences(bodyAdf);
+        return {
+          id: comment.id,
+          author: comment.author?.displayName ?? null,
+          authorAccountId: comment.author?.accountId ?? null,
+          authorAvatarUrl: comment.author?.avatarUrls?.['48x48'] ?? null,
+          body: adfToStructuredText(rawBody) ?? '',
+          bodyAdf: rawBody,
+          mentionedAccountIds: mentionIds,
+          attachmentFilenames: mediaIds
+            .map((id) => attachmentFilenameById.get(id))
+            .filter((filename): filename is string => filename !== undefined),
+          createdAt: toIsoDate(comment.created),
+        };
+      })
       .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))
       .slice(0, MAX_COMMENTS);
 

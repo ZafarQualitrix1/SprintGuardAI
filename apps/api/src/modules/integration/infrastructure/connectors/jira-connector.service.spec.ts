@@ -241,6 +241,67 @@ describe('JiraConnectorService', () => {
     });
   });
 
+  describe('fetchIssueDetail', () => {
+    it('maps comment author accountId/avatar, mentions, and inline-media attachment filenames', async () => {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse([]))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            key: 'PROJ-9',
+            fields: {
+              summary: 'Implement login',
+              status: { name: 'In Progress' },
+              comment: {
+                comments: [
+                  {
+                    id: 'c1',
+                    author: {
+                      accountId: 'acc-1',
+                      displayName: 'Jane Doe',
+                      avatarUrls: { '48x48': 'https://avatar/jane' },
+                    },
+                    created: '2026-01-02T00:00:00.000Z',
+                    body: {
+                      type: 'doc',
+                      content: [
+                        {
+                          type: 'paragraph',
+                          content: [
+                            { type: 'text', text: 'Approved, cc ' },
+                            { type: 'mention', attrs: { id: 'acc-2', text: '@John' } },
+                            { type: 'text', text: ' see attached' },
+                          ],
+                        },
+                        {
+                          type: 'mediaSingle',
+                          content: [{ type: 'media', attrs: { id: 'att-1', type: 'file' } }],
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+              attachment: [{ id: 'att-1', filename: 'evidence.png', size: 10, mimeType: 'image/png' }],
+            },
+          }),
+        );
+
+      const result = await connector.fetchIssueDetail('PROJ-9', credentials, config);
+
+      expect(result.comments).toEqual([
+        expect.objectContaining({
+          id: 'c1',
+          author: 'Jane Doe',
+          authorAccountId: 'acc-1',
+          authorAvatarUrl: 'https://avatar/jane',
+          mentionedAccountIds: ['acc-2'],
+          attachmentFilenames: ['evidence.png'],
+          createdAt: new Date('2026-01-02T00:00:00.000Z'),
+        }),
+      ]);
+    });
+  });
+
   describe('fetchActiveSprints', () => {
     it('maps active/future sprints for a board', async () => {
       fetchMock.mockResolvedValueOnce(

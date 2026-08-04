@@ -745,6 +745,33 @@ model BaReviewSyncLog {
   @@index([organizationId, status])
 }
 
+// Real Jira comment-thread mirror: every comment SyncBaReviewThreadsCommand has ever seen on the
+// issue, not just the one newest reply it acts on -- a full audit-grade record of the conversation,
+// additive to BaReviewCycle's per-version rollup. Idempotent per (storyId, jiraCommentId) so re-polling
+// the same comment is a no-op update, not a duplicate row. No FK relation to Story, matching
+// BaReviewSyncLog's existing denormalized-id convention for this module's per-event tables.
+model BaReviewJiraComment {
+  id                  String    @id @default(cuid())
+  storyId             String
+  organizationId      String
+  jiraCommentId       String
+  authorDisplayName   String?
+  authorAccountId     String?
+  authorAvatarUrl     String?
+  bodyAdf             Json?
+  bodyText            String
+  mentionedAccountIds Json? // string[]
+  attachmentFilenames Json? // string[]
+  isOwnComment        Boolean   @default(false) // posted by SprintGuard AI itself, not a genuine BA reply
+  classifiedAs        String? // 'APPROVAL' | 'FEEDBACK' -- set only on the one comment ProcessBaReplyCommand actually acted on
+  jiraCreatedAt       DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@unique([storyId, jiraCommentId])
+  @@index([organizationId])
+  @@index([storyId, jiraCreatedAt])
+}
+
 // ============================================================================
 // Coverage & Risk
 // ============================================================================

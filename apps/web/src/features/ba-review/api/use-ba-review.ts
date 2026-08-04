@@ -23,6 +23,17 @@ export function useBaReviewSyncLogs(storyId: string) {
   return useQuery({ queryKey: syncLogsKey(storyId), queryFn: () => baReviewApi.getSyncLogs(storyId) });
 }
 
+// Polled every 30s while the page is open so the mirror keeps pace with new Jira replies without a
+// manual refresh -- independent of the 5-minute backend sync cadence (SyncBaReviewThreadsCommand),
+// which only needs to run often enough to trigger regeneration promptly, not to drive this UI.
+export function useReviewCommentThread(storyId: string) {
+  return useQuery({
+    queryKey: ['ba-review', 'comments', storyId],
+    queryFn: () => baReviewApi.getCommentThread(storyId),
+    refetchInterval: 30_000,
+  });
+}
+
 function useInvalidateBaReview(storyId: string) {
   const queryClient = useQueryClient();
   return () => {
