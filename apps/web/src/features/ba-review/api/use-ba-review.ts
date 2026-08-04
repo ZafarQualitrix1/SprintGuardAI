@@ -34,6 +34,13 @@ export function useReviewCommentThread(storyId: string) {
   });
 }
 
+export function useAuditTrail(storyId: string) {
+  return useQuery({
+    queryKey: ['ba-review', 'audit-trail', storyId],
+    queryFn: () => baReviewApi.getAuditTrail(storyId),
+  });
+}
+
 function useInvalidateBaReview(storyId: string) {
   const queryClient = useQueryClient();
   return () => {

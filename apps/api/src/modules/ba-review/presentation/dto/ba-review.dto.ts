@@ -76,6 +76,15 @@ export interface SubmitForReviewDto {
   comment?: string;
 }
 
+export interface AuditTrailEntryDto {
+  id: string;
+  actorEmail: string | null;
+  action: string;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+}
+
 export interface BaReviewJiraCommentDto {
   id: string;
   jiraCommentId: string;

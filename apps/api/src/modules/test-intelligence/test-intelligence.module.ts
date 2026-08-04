@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
+import { IntegrationModule } from '../integration/integration.module';
 import { TestIntelligenceController } from './presentation/test-intelligence.controller';
 
 import { TEST_INTELLIGENCE_COMMAND_HANDLERS } from './application/commands';
@@ -16,9 +17,11 @@ import { PrismaStoryMetadataReadRepository } from './infrastructure/repositories
 import { TestCaseExportService } from './application/services/test-case-export.service';
 
 // Bounded context module: Test Intelligence (Solution Architecture §6). Imports AiModule for
-// AiOrchestrationService, same shared-service pattern as requirement-intelligence.
+// AiOrchestrationService, same shared-service pattern as requirement-intelligence. IntegrationModule
+// for AuditLogService (ExportTestCasesHandler logs every export) -- same shared-provider pattern
+// ba-review already uses for the same service.
 @Module({
-  imports: [AiModule],
+  imports: [AiModule, IntegrationModule],
   controllers: [TestIntelligenceController],
   providers: [
     ...TEST_INTELLIGENCE_COMMAND_HANDLERS,

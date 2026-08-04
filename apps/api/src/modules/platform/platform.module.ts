@@ -18,6 +18,9 @@ import { PlatformAuditLogService } from './infrastructure/services/platform-audi
     PlatformAuditLogService,
     { provide: AUDIT_LOG_REPOSITORY, useClass: PrismaAuditLogRepository },
   ],
-  exports: [],
+  // AUDIT_LOG_REPOSITORY exported for ba-review's GetAuditTrailQuery -- same "shared provider"
+  // precedent as IntegrationModule exporting AuditLogService, avoids a second read implementation
+  // against the same AuditLog table.
+  exports: [AUDIT_LOG_REPOSITORY],
 })
 export class PlatformModule {}

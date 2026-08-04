@@ -29,6 +29,8 @@ import { GetReviewTimelineQuery } from '../application/queries/get-review-timeli
 import { GetBaReviewSyncLogsQuery } from '../application/queries/get-ba-review-sync-logs.query';
 import { GetSubmissionDraftQuery } from '../application/queries/get-submission-draft.query';
 import { GetReviewCommentThreadQuery } from '../application/queries/get-review-comment-thread.query';
+import { GetAuditTrailQuery } from '../application/queries/get-audit-trail.query';
+import { AuditLogEntry } from '../../platform/domain/repositories/audit-log.repository.interface';
 import { ApproveReviewCycleCommand } from '../application/commands/approve-review-cycle.command';
 import { ProcessBaReplyCommand } from '../application/commands/process-ba-reply.command';
 import { AdminUnlockStoryCommand } from '../application/commands/admin-unlock-story.command';
@@ -44,6 +46,7 @@ import { BaReviewJiraCommentEntity } from '../domain/entities/ba-review-jira-com
 import {
   AdminUnlockDto,
   ApproveReviewCycleDto,
+  AuditTrailEntryDto,
   BaReviewCycleDto,
   BaReviewJiraCommentDto,
   BaReviewStatusDto,
@@ -183,6 +186,25 @@ export class BaReviewController {
       new GetReviewCommentThreadQuery(storyId, user.organizationId),
     );
     return comments.map(toCommentDto);
+  }
+
+  @Get('audit-trail')
+  @RequirePermission('test:read')
+  async getAuditTrail(
+    @Param('storyId') storyId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AuditTrailEntryDto[]> {
+    const entries = await this.queryBus.execute<GetAuditTrailQuery, AuditLogEntry[]>(
+      new GetAuditTrailQuery(storyId, user.organizationId),
+    );
+    return entries.map((entry) => ({
+      id: entry.id,
+      actorEmail: entry.actorEmail,
+      action: entry.action,
+      before: entry.before,
+      after: entry.after,
+      createdAt: entry.createdAt.toISOString(),
+    }));
   }
 
   @Get('jira-users')
@@ -345,7 +367,9 @@ export class BaReviewController {
     @Body() body: UpdateBaAssignmentDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ updated: true }> {
-    await this.commandBus.execute(new UpdateBaAssignmentCommand(user.organizationId, storyId, body.assignedBaEmail));
+    await this.commandBus.execute(
+      new UpdateBaAssignmentCommand(user.organizationId, storyId, user.userId, body.assignedBaEmail),
+    );
     return { updated: true };
   }
 

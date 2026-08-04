@@ -1,5 +1,6 @@
 import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   STORY_BA_REVIEW_STATE_REPOSITORY,
   IStoryBaReviewStateRepository,
@@ -9,6 +10,7 @@ export class UpdateBaAssignmentCommand {
   constructor(
     public readonly organizationId: string,
     public readonly storyId: string,
+    public readonly actorId: string,
     public readonly assignedBaEmail: string | null,
   ) {}
 }
@@ -19,6 +21,7 @@ export class UpdateBaAssignmentCommand {
 export class UpdateBaAssignmentHandler implements ICommandHandler<UpdateBaAssignmentCommand, void> {
   constructor(
     @Inject(STORY_BA_REVIEW_STATE_REPOSITORY) private readonly stateRepository: IStoryBaReviewStateRepository,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async execute(command: UpdateBaAssignmentCommand): Promise<void> {
@@ -28,5 +31,15 @@ export class UpdateBaAssignmentHandler implements ICommandHandler<UpdateBaAssign
       assignedBaJiraAccountId: null,
       assignedBaAccountResolvedAt: null,
     });
+
+    await this.auditLogService.record(
+      command.organizationId,
+      command.actorId,
+      'ba_review.assignment_updated',
+      'Story',
+      command.storyId,
+      undefined,
+      { assignedBaEmail: command.assignedBaEmail },
+    );
   }
 }

@@ -72,6 +72,15 @@ export interface JiraUserMatch {
   avatarUrl: string | null;
 }
 
+export interface AuditTrailEntry {
+  id: string;
+  actorEmail: string | null;
+  action: string;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+}
+
 export interface BaReviewJiraComment {
   id: string;
   jiraCommentId: string;

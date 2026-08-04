@@ -1,5 +1,6 @@
 import { Inject, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   STORY_CONTEXT_READ_REPOSITORY,
   IStoryContextReadRepository,
@@ -47,6 +48,7 @@ export class TriggerBaReviewHandler implements ICommandHandler<TriggerBaReviewCo
     private readonly documentBuilderService: DocumentBuilderService,
     private readonly resolveBaAccountService: ResolveBaAccountService,
     private readonly postReviewCommentService: PostReviewCommentService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async execute(command: TriggerBaReviewCommand): Promise<BaReviewCycleEntity | null> {
@@ -88,6 +90,25 @@ export class TriggerBaReviewHandler implements ICommandHandler<TriggerBaReviewCo
     });
 
     await this.stateRepository.startNewCycle(command.storyId, cycle.id, version);
+
+    await this.auditLogService.record(
+      command.organizationId,
+      command.actorId,
+      'ba_review.cycle_generated',
+      'Story',
+      command.storyId,
+      undefined,
+      {
+        reviewCycleId: cycle.id,
+        version: cycle.documentVersionLabel,
+        totalTestCases,
+        coveragePercent,
+        automationReadinessPercent,
+        aiProvider: command.aiProvider,
+        aiModelVersion: command.aiModelVersion,
+        promptVersion: command.promptVersion,
+      },
+    );
 
     if (!story.externalId || !story.sourceConnectionId) {
       this.logger.log(`Story ${command.storyId} has no live Jira connection; skipping BA review Jira post.`);

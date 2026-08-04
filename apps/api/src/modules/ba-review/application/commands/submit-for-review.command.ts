@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   STORY_BA_REVIEW_STATE_REPOSITORY,
   IStoryBaReviewStateRepository,
@@ -50,6 +51,7 @@ export class SubmitForReviewHandler
     @Inject(STORY_CONTEXT_READ_REPOSITORY) private readonly storyContextRepository: IStoryContextReadRepository,
     private readonly documentBuilderService: DocumentBuilderService,
     private readonly postReviewCommentService: PostReviewCommentService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async execute(command: SubmitForReviewCommand): Promise<{ commentId: string; attachmentId: string | null }> {
@@ -111,6 +113,22 @@ export class SubmitForReviewHandler
 
     await this.cycleRepository.setJiraPostResult(activeCycle.id, result.commentId, result.attachmentId);
     await this.stateRepository.setStatus(command.storyId, 'AWAITING_APPROVAL');
+
+    await this.auditLogService.record(
+      command.organizationId,
+      command.actorId,
+      'ba_review.submitted_manually',
+      'Story',
+      command.storyId,
+      undefined,
+      {
+        reviewCycleId: activeCycle.id,
+        mention: command.mention.displayName,
+        ccMentions: command.ccMentions.map((cc) => cc.displayName),
+        hasReplacementAttachment: command.replacementAttachment !== null,
+        commentId: result.commentId,
+      },
+    );
 
     return result;
   }

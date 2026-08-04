@@ -1,5 +1,6 @@
 import { Inject, NotFoundException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   TEST_SCENARIO_REPOSITORY,
   ITestScenarioRepository,
@@ -21,6 +22,7 @@ export class ExportTestCasesQuery {
     public readonly organizationId: string,
     public readonly storyId: string,
     public readonly format: TestCaseExportFormat,
+    public readonly actorId: string,
   ) {}
 }
 
@@ -35,6 +37,7 @@ export class ExportTestCasesHandler implements IQueryHandler<ExportTestCasesQuer
     @Inject(TEST_SCENARIO_REPOSITORY) private readonly testScenarioRepository: ITestScenarioRepository,
     @Inject(STORY_METADATA_READ_REPOSITORY) private readonly storyMetadataRepository: IStoryMetadataReadRepository,
     private readonly exportService: TestCaseExportService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async execute(query: ExportTestCasesQuery): Promise<TestCaseExportResult> {
@@ -50,6 +53,16 @@ export class ExportTestCasesHandler implements IQueryHandler<ExportTestCasesQuer
       query.format === 'xlsx'
         ? this.exportService.buildWorkbook(scenarios, story)
         : this.exportService.buildCsv(scenarios);
+
+    await this.auditLogService.record(
+      query.organizationId,
+      query.actorId,
+      'ba_review.test_cases_exported',
+      'Story',
+      query.storyId,
+      undefined,
+      { format: query.format },
+    );
 
     return {
       filename: `${namePrefix}.${query.format}`,

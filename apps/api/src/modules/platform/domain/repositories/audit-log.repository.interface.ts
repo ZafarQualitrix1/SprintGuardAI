@@ -20,6 +20,7 @@ export interface ListAuditLogsFilters {
   actorId?: string;
   action?: string;
   targetType?: string;
+  targetId?: string; // narrows to a single entity's history, e.g. one story's BA review audit trail
   dateFrom?: Date;
   dateTo?: Date;
   page?: number;

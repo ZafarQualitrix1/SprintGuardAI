@@ -3,6 +3,7 @@ import { AiModule } from '../ai/ai.module';
 import { TestIntelligenceModule } from '../test-intelligence/test-intelligence.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { IntegrationModule } from '../integration/integration.module';
+import { PlatformModule } from '../platform/platform.module';
 import { BaReviewController } from './presentation/ba-review.controller';
 import { InternalBaReviewController } from './presentation/internal-ba-review.controller';
 
@@ -27,13 +28,14 @@ import { PostReviewCommentService } from './application/services/post-review-com
 // Bounded context module: BA Review Workflow -- mandatory Business-Analyst approval gate for
 // AI-generated test cases, over Jira. Imports AiModule (AiOrchestrationService, shared-service
 // pattern), TestIntelligenceModule (TEST_CASE_REPOSITORY/TEST_SCENARIO_REPOSITORY, needed directly
-// for the feedback-driven changeset), NotificationsModule and IntegrationModule's AuditLogService
-// (same shared-provider pattern). Reaches `integration`'s connector-wrapping commands/queries
+// for the feedback-driven changeset), NotificationsModule, IntegrationModule's AuditLogService (for
+// writing) and PlatformModule's AUDIT_LOG_REPOSITORY (for GetAuditTrailQuery's read) -- same
+// shared-provider pattern for both. Reaches `integration`'s connector-wrapping commands/queries
 // (PostIssueCommentCommand, UploadIssueAttachmentCommand, ResolveExternalUserQuery,
 // FetchExternalIssueDetailQuery) via the global CommandBus/QueryBus instead, same cross-module
 // boundary requirement-intelligence already uses.
 @Module({
-  imports: [AiModule, TestIntelligenceModule, NotificationsModule, IntegrationModule],
+  imports: [AiModule, TestIntelligenceModule, NotificationsModule, IntegrationModule, PlatformModule],
   controllers: [BaReviewController, InternalBaReviewController],
   providers: [
     ...BA_REVIEW_COMMAND_HANDLERS,

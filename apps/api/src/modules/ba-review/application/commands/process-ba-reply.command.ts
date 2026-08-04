@@ -1,6 +1,7 @@
 import { Inject, Logger } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { NotificationService } from '../../../notifications/application/services/notification.service';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   STORY_BA_REVIEW_STATE_REPOSITORY,
   IStoryBaReviewStateRepository,
@@ -37,6 +38,7 @@ export class ProcessBaReplyHandler implements ICommandHandler<ProcessBaReplyComm
     @Inject(STORY_BA_REVIEW_STATE_REPOSITORY) private readonly stateRepository: IStoryBaReviewStateRepository,
     @Inject(BA_REVIEW_CYCLE_REPOSITORY) private readonly cycleRepository: IBaReviewCycleRepository,
     private readonly notificationService: NotificationService,
+    private readonly auditLogService: AuditLogService,
     private readonly commandBus: CommandBus,
   ) {}
 
@@ -69,6 +71,16 @@ export class ProcessBaReplyHandler implements ICommandHandler<ProcessBaReplyComm
       reviewedAt: command.replyCreatedAt,
       status: 'FEEDBACK_RECEIVED',
     });
+
+    await this.auditLogService.record(
+      command.organizationId,
+      null,
+      'ba_review.feedback_received',
+      'Story',
+      command.storyId,
+      undefined,
+      { reviewCycleId: command.reviewCycleId, feedbackAuthor: command.replyAuthor, feedbackText: command.replyText },
+    );
 
     try {
       const cycle = await this.cycleRepository.findById(command.reviewCycleId);

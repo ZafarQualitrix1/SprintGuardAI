@@ -20,6 +20,7 @@ export class PrismaAuditLogRepository implements IAuditLogRepository {
       ...(filters.actorId ? { actorId: filters.actorId } : {}),
       ...(filters.action ? { action: { contains: filters.action, mode: 'insensitive' } } : {}),
       ...(filters.targetType ? { targetType: filters.targetType } : {}),
+      ...(filters.targetId ? { targetId: filters.targetId } : {}),
       ...(filters.dateFrom || filters.dateTo
         ? { createdAt: { ...(filters.dateFrom ? { gte: filters.dateFrom } : {}), ...(filters.dateTo ? { lte: filters.dateTo } : {}) } }
         : {}),

@@ -1,6 +1,7 @@
 import { Inject, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import {
   TEST_CASE_REPOSITORY,
   ITestCaseRepository,
@@ -60,6 +61,7 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
     private readonly documentBuilderService: DocumentBuilderService,
     private readonly resolveBaAccountService: ResolveBaAccountService,
     private readonly postReviewCommentService: PostReviewCommentService,
+    private readonly auditLogService: AuditLogService,
     private readonly queryBus: QueryBus,
   ) {}
 
@@ -214,6 +216,24 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
       });
 
       await this.stateRepository.startNewCycle(command.storyId, newCycle.id, version);
+
+      await this.auditLogService.record(
+        command.organizationId,
+        null,
+        'ba_review.regenerated_from_feedback',
+        'Story',
+        command.storyId,
+        { previousReviewCycleId: previousCycle.id, feedbackText: previousCycle.feedbackText, feedbackAuthor: previousCycle.feedbackAuthor },
+        {
+          reviewCycleId: newCycle.id,
+          version: newCycle.documentVersionLabel,
+          totalTestCases,
+          feedbackSummary: improvementSummary.feedbackSummary,
+          aiProvider: result.provider,
+          aiModelVersion: result.model,
+          promptVersion: result.promptVersion,
+        },
+      );
 
       if (story.externalId && story.sourceConnectionId) {
         const mention = await this.resolveBaAccountService.resolve({

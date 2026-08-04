@@ -77,7 +77,7 @@ export class TestIntelligenceController {
     }
 
     const result = await this.queryBus.execute<ExportTestCasesQuery, TestCaseExportResult>(
-      new ExportTestCasesQuery(user.organizationId, storyId, format as TestCaseExportFormat),
+      new ExportTestCasesQuery(user.organizationId, storyId, format as TestCaseExportFormat, user.userId),
     );
 
     res.set({

@@ -5,6 +5,7 @@ export * from './get-review-timeline.query';
 export * from './get-ba-review-sync-logs.query';
 export * from './get-submission-draft.query';
 export * from './get-review-comment-thread.query';
+export * from './get-audit-trail.query';
 
 import { IsStoryLockedHandler } from './is-story-locked.query';
 import { GetBaReviewStatusHandler } from './get-ba-review-status.query';
@@ -12,6 +13,7 @@ import { GetReviewTimelineHandler } from './get-review-timeline.query';
 import { GetBaReviewSyncLogsHandler } from './get-ba-review-sync-logs.query';
 import { GetSubmissionDraftHandler } from './get-submission-draft.query';
 import { GetReviewCommentThreadHandler } from './get-review-comment-thread.query';
+import { GetAuditTrailHandler } from './get-audit-trail.query';
 
 export const BA_REVIEW_QUERY_HANDLERS = [
   IsStoryLockedHandler,
@@ -20,4 +22,5 @@ export const BA_REVIEW_QUERY_HANDLERS = [
   GetBaReviewSyncLogsHandler,
   GetSubmissionDraftHandler,
   GetReviewCommentThreadHandler,
+  GetAuditTrailHandler,
 ];
