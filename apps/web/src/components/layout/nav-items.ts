@@ -8,6 +8,8 @@ import {
   Sparkles,
   FileText,
   Bot,
+  Globe,
+  Webhook,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -25,9 +27,10 @@ export interface NavSection {
 }
 
 // Primary navigation, mirroring the MVP page scope. Sprint-scoped pages (Analysis, Story
-// Intelligence, Requirement Intelligence, Coverage, AI Test Generator, Executions, Release
+// Intelligence, Requirement Intelligence, AI Test Generator, Manual Execution, Release
 // Readiness) are reached by drilling into a sprint from /dashboard/sprints, not top-level nav
-// items -- they require a [sprintId] param.
+// items -- they require a [sprintId] param. Automation is the exception: it's cross-sprint (a BA-
+// approved test case from any sprint can be automated from one place), so it lives here instead.
 export const navSections: NavSection[] = [
   {
     title: 'Overview',
@@ -35,6 +38,13 @@ export const navSections: NavSection[] = [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Sprints', href: '/dashboard/sprints', icon: Rocket },
       { label: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Automation',
+    items: [
+      { label: 'Web Automation', href: '/dashboard/automation/web', icon: Globe },
+      { label: 'API Automation', href: '/dashboard/automation/api', icon: Webhook },
     ],
   },
   {

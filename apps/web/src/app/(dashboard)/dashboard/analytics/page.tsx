@@ -235,11 +235,6 @@ export default function AnalyticsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base">Test Coverage</CardTitle>
-                {activeSprintId ? (
-                  <Link href={`/dashboard/sprints/${activeSprintId}/coverage`} className="text-xs text-primary hover:underline">
-                    View full coverage →
-                  </Link>
-                ) : null}
               </CardHeader>
               <CardContent>
                 {isCoverageLoading ? (

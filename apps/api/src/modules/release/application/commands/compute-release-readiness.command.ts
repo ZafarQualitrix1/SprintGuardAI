@@ -1,6 +1,7 @@
 import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandBus, CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { ComputeCoverageCommand } from '../../../coverage/application/commands/compute-coverage.command';
 import {
   RELEASE_METRICS_READ_REPOSITORY,
   IReleaseMetricsReadRepository,
@@ -37,6 +38,7 @@ export class ComputeReleaseReadinessHandler
     @Inject(RELEASE_SCORING_CONFIG_REPOSITORY)
     private readonly scoringConfigRepository: IReleaseScoringConfigRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async execute(command: ComputeReleaseReadinessCommand): Promise<ReleaseReportEntity> {
@@ -44,6 +46,13 @@ export class ComputeReleaseReadinessHandler
     if (!ref) {
       throw new NotFoundException('Sprint not found');
     }
+
+    // Coverage no longer has a dedicated page (Sprint Details tab removed) -- Release Readiness is
+    // its only remaining consumer, so this recomputes coverage itself right before reading it,
+    // rather than depending on a user having visited a page that no longer exists. Awaited (not
+    // fire-and-forget): the metrics read immediately below needs the freshly-written
+    // CoverageMatrixEntry rows to be there.
+    await this.commandBus.execute(new ComputeCoverageCommand(command.organizationId, command.sprintId));
 
     const [requirementCoverage, testCaseCoverage, manualExecution, automationExecution, bugRisk, gates, savedConfig] =
       await Promise.all([

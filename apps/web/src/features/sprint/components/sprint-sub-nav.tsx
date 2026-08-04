@@ -8,14 +8,16 @@ interface SprintSubNavProps {
   sprintId: string;
 }
 
+// Coverage and Automation/Automation Execution moved out of the per-sprint tab bar: coverage now
+// computes silently as part of Release Readiness (still a real dependency, just no longer a page a
+// user visits directly), and automation is cross-sprint now, living under the top-level
+// "Automation" nav section instead (see components/layout/nav-items.ts) since a BA-approved test
+// case from any sprint can be automated from one place.
 const TABS = [
   { label: 'Analysis', suffix: '' },
   { label: 'Requirements', suffix: 'requirements' },
   { label: 'Test Generator', suffix: 'test-generator' },
-  { label: 'Coverage', suffix: 'coverage' },
-  { label: 'Automation', suffix: 'automation' },
   { label: 'Manual Execution', suffix: 'executions' },
-  { label: 'Automation Execution', suffix: 'automation-execution' },
   { label: 'Release Readiness', suffix: 'release-readiness' },
 ] as const;
 
