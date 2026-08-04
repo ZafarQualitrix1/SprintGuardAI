@@ -172,6 +172,22 @@ export interface IIntegrationConnector {
     credentials: ConnectorCredentials,
     config: Record<string, unknown>,
   ): Promise<{ accountId: string; displayName: string } | null>;
+  /**
+   * Multi-result user search backing the Submit for Review modal's BA mention/CC pickers -- unlike
+   * resolveUserAccountId (single best match, for automatic @mention resolution), this returns every
+   * match so a human can choose. Capped by the connector implementation.
+   */
+  searchUsers(
+    query: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalUserMatch[]>;
+}
+
+export interface ExternalUserMatch {
+  accountId: string;
+  displayName: string;
+  avatarUrl: string | null;
 }
 
 // Multi-provider injection token: integration.module.ts binds this to an array of every

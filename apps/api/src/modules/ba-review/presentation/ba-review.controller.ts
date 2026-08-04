@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { GetCurrentUserQuery } from '../../iam/application/queries/get-current-user.query';
 import { AuthenticatedUserView } from '../../iam/application/commands/auth-session.types';
+import { ExternalUserMatch } from '../../integration/application/ports/integration-connector.port';
+import { SearchExternalUsersQuery } from '../../integration/application/queries/search-external-users.query';
 import { GetBaReviewStatusQuery, BaReviewStatusResult } from '../application/queries/get-ba-review-status.query';
 import { GetReviewTimelineQuery } from '../application/queries/get-review-timeline.query';
 import { GetBaReviewSyncLogsQuery } from '../application/queries/get-ba-review-sync-logs.query';
@@ -13,6 +15,10 @@ import { ProcessBaReplyCommand } from '../application/commands/process-ba-reply.
 import { AdminUnlockStoryCommand } from '../application/commands/admin-unlock-story.command';
 import { UpdateBaAssignmentCommand } from '../application/commands/update-ba-assignment.command';
 import { SyncBaReviewThreadsCommand, SyncBaReviewThreadsResult } from '../application/commands/sync-ba-review-threads.command';
+import {
+  STORY_CONTEXT_READ_REPOSITORY,
+  IStoryContextReadRepository,
+} from '../domain/repositories/story-context-read.repository.interface';
 import { BaReviewCycleEntity } from '../domain/entities/ba-review-cycle.entity';
 import {
   AdminUnlockDto,
@@ -60,6 +66,7 @@ export class BaReviewController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    @Inject(STORY_CONTEXT_READ_REPOSITORY) private readonly storyContextRepository: IStoryContextReadRepository,
   ) {}
 
   @Get()
@@ -117,6 +124,28 @@ export class BaReviewController {
       errorMessage: log.errorMessage,
       createdAt: log.createdAt.toISOString(),
     }));
+  }
+
+  @Get('jira-users')
+  @RequirePermission('test:write')
+  async searchJiraUsers(
+    @Param('storyId') storyId: string,
+    @Query('q') searchQuery: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ExternalUserMatch[]> {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      throw new BadRequestException('q must be at least 2 characters');
+    }
+    const story = await this.storyContextRepository.findById(storyId, user.organizationId);
+    if (!story) {
+      throw new NotFoundException('Story not found');
+    }
+    if (!story.sourceConnectionId) {
+      return [];
+    }
+    return this.queryBus.execute<SearchExternalUsersQuery, ExternalUserMatch[]>(
+      new SearchExternalUsersQuery(user.organizationId, story.sourceConnectionId, searchQuery),
+    );
   }
 
   @Post('approve')

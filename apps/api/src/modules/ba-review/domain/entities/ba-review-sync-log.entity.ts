@@ -3,7 +3,8 @@ export type BaReviewSyncAction =
   | 'POST_INITIAL_COMMENT'
   | 'UPLOAD_ATTACHMENT'
   | 'POLL_REPLIES'
-  | 'POST_FOLLOWUP_COMMENT';
+  | 'POST_FOLLOWUP_COMMENT'
+  | 'POST_MANUAL_SUBMISSION';
 
 export type BaReviewSyncStatus = 'SUCCESS' | 'FAILED';
 

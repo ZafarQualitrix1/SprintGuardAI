@@ -10,6 +10,7 @@ import {
   ExternalProjectPayload,
   ExternalSprintPayload,
   ExternalStoryPayload,
+  ExternalUserMatch,
   IIntegrationConnector,
 } from '../../application/ports/integration-connector.port';
 import { extractJiraBoardId, parseJiraSprintReference } from './jira-reference.util';
@@ -125,6 +126,7 @@ interface JiraCreatedAttachmentResponse {
 interface JiraUserSearchResult {
   accountId: string;
   displayName: string;
+  avatarUrls?: Record<string, string>;
 }
 
 interface JiraIssueDetailResponse {
@@ -721,5 +723,32 @@ export class JiraConnectorService implements IIntegrationConnector {
     const results = (await response.json()) as JiraUserSearchResult[];
     const match = results[0];
     return match ? { accountId: match.accountId, displayName: match.displayName } : null;
+  }
+
+  // Submit for Review modal's BA mention/CC pickers -- same endpoint as resolveUserAccountId
+  // above, but returns every match (capped) instead of only the best one, since a human is
+  // choosing here rather than the system auto-resolving a single @mention.
+  async searchUsers(
+    query: string,
+    credentials: ConnectorCredentials,
+    config: Record<string, unknown>,
+  ): Promise<ExternalUserMatch[]> {
+    const jiraCredentials = credentials as JiraCredentials;
+    const jiraConfig = config as unknown as JiraConfig;
+    const headers = { Authorization: this.authHeader(jiraCredentials), Accept: 'application/json' };
+
+    const response = (await fetch(
+      `${jiraConfig.siteUrl}/rest/api/3/user/search?query=${encodeURIComponent(query)}&maxResults=10`,
+      { headers },
+    )) as unknown as FetchResponse;
+    if (!response.ok) {
+      return [];
+    }
+    const results = (await response.json()) as JiraUserSearchResult[];
+    return results.map((r) => ({
+      accountId: r.accountId,
+      displayName: r.displayName,
+      avatarUrl: r.avatarUrls?.['48x48'] ?? null,
+    }));
   }
 }

@@ -191,6 +191,56 @@ export class PostReviewCommentService {
     });
   }
 
+  // Submit for Review modal's explicit path (additional to the automatic postInitial/postFollowup
+  // triggers) -- posts a user-edited summary, an optional free-text comment, a mandatory BA
+  // mention, and optional CC mentions, using whichever attachment the caller resolved (either the
+  // freshly-rebuilt workbook from the active cycle's snapshot, or a user-uploaded replacement).
+  async postManualSubmission(input: {
+    organizationId: string;
+    connectionId: string;
+    externalId: string;
+    storyId: string;
+    reviewCycleId: string;
+    mention: ResolvedBaAccount;
+    ccMentions: ResolvedBaAccount[];
+    summary: string;
+    comment: string | null;
+    documentBuffer: Buffer;
+    documentFilename: string;
+  }): Promise<{ commentId: string; attachmentId: string | null }> {
+    const summaryParagraphs = input.summary
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => paragraph([line]));
+
+    const mentionRuns: InlineRun[] = [
+      { mention: input.mention },
+      ...input.ccMentions.flatMap((cc): InlineRun[] => [' ', { mention: cc }]),
+    ];
+
+    const body = doc([
+      paragraph([{ strong: 'SprintGuard AI — Test Cases Submitted for Review' }]),
+      ...summaryParagraphs,
+      ...(input.comment ? [paragraph([input.comment])] : []),
+      paragraph([
+        ...mentionRuns,
+        ', please review the attached test cases and reply on this thread with your approval or any feedback. Thank you.',
+      ]),
+    ]);
+
+    return this.postAndAttach({
+      organizationId: input.organizationId,
+      connectionId: input.connectionId,
+      externalId: input.externalId,
+      storyId: input.storyId,
+      reviewCycleId: input.reviewCycleId,
+      commentAdfBody: body,
+      commentAction: 'POST_MANUAL_SUBMISSION',
+      documentBuffer: input.documentBuffer,
+      documentFilename: input.documentFilename,
+    });
+  }
+
   private async postAndAttach(input: {
     organizationId: string;
     connectionId: string;
@@ -198,7 +248,7 @@ export class PostReviewCommentService {
     storyId: string;
     reviewCycleId: string;
     commentAdfBody: unknown;
-    commentAction: 'POST_INITIAL_COMMENT' | 'POST_FOLLOWUP_COMMENT';
+    commentAction: 'POST_INITIAL_COMMENT' | 'POST_FOLLOWUP_COMMENT' | 'POST_MANUAL_SUBMISSION';
     documentBuffer: Buffer;
     documentFilename: string;
   }): Promise<{ commentId: string; attachmentId: string | null }> {
@@ -230,7 +280,7 @@ export class PostReviewCommentService {
 
   private async withRetry<T>(
     ctx: { storyId: string; organizationId: string; reviewCycleId: string },
-    action: 'UPLOAD_ATTACHMENT' | 'POST_INITIAL_COMMENT' | 'POST_FOLLOWUP_COMMENT',
+    action: 'UPLOAD_ATTACHMENT' | 'POST_INITIAL_COMMENT' | 'POST_FOLLOWUP_COMMENT' | 'POST_MANUAL_SUBMISSION',
     fn: () => Promise<T>,
     optional = false,
   ): Promise<T | null> {

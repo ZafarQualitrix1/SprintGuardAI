@@ -64,11 +64,11 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  memberships        Membership[]
-  refreshTokens      RefreshToken[]
-  promptApprovals    PromptApproval[]
-  auditLogs          AuditLog[]          @relation("AuditActor")
-  notifications      NotificationEvent[]
+  memberships         Membership[]
+  refreshTokens       RefreshToken[]
+  promptApprovals     PromptApproval[]
+  auditLogs           AuditLog[]           @relation("AuditActor")
+  notifications       NotificationEvent[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([email])
@@ -179,13 +179,14 @@ model Project {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sprints        Sprint[]
-  coverageMatrix CoverageMatrixEntry[]
-  gaps           Gap[]
-  releaseReports ReleaseReport[]
-  documentAssets DocumentAsset[]
-  projectMemory  ProjectMemory?
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sprints              Sprint[]
+  coverageMatrix       CoverageMatrixEntry[]
+  gaps                 Gap[]
+  releaseReports       ReleaseReport[]
+  documentAssets       DocumentAsset[]
+  projectMemory        ProjectMemory?
+  releaseScoringConfig ReleaseScoringConfig?
 
   @@unique([organizationId, key])
   @@index([organizationId])
@@ -207,28 +208,32 @@ enum SprintSource {
 }
 
 model Sprint {
-  id                 String       @id @default(cuid())
-  projectId          String
-  externalId         String?
-  name               String
-  goal               String?
-  status             SprintStatus @default(PLANNED)
-  source             SprintSource @default(MANUAL)
-  startDate          DateTime?
-  endDate            DateTime?
-  rawImport          Json?
+  id                          String       @id @default(cuid())
+  projectId                   String
+  externalId                  String?
+  name                        String
+  goal                        String?
+  status                      SprintStatus @default(PLANNED)
+  source                      SprintSource @default(MANUAL)
+  startDate                   DateTime?
+  endDate                     DateTime?
+  rawImport                   Json?
   // Jira connection this sprint was imported through, if any -- lets a story re-resolve live
   // Jira credentials for a deep re-fetch at analysis time. SetNull (not Cascade): deleting the
   // Jira connection must never take historical sprints/stories with it.
-  sourceConnectionId String?
+  sourceConnectionId          String?
   // Sync/lifecycle metadata. archivedAt/deletedAt are soft-state (same pattern as Organization/
   // Project), not enum values on SprintStatus, so archiving/deleting never collides with the
   // Jira-mirrored PLANNED/ACTIVE/COMPLETED/CANCELLED status.
-  lastSyncedAt       DateTime?
-  archivedAt         DateTime?
-  deletedAt          DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  lastSyncedAt                DateTime?
+  archivedAt                  DateTime?
+  deletedAt                   DateTime?
+  // Release Readiness mandatory gates (Rules 7/8): manually toggled until a full
+  // Regression/Deployment-checklist module exists to derive these automatically.
+  regressionCompleted         Boolean      @default(false)
+  deploymentChecklistComplete Boolean      @default(false)
+  createdAt                   DateTime     @default(now())
+  updatedAt                   DateTime     @updatedAt
 
   project          Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
   sourceConnection IntegrationConnection? @relation(fields: [sourceConnectionId], references: [id], onDelete: SetNull)
@@ -649,6 +654,7 @@ enum BaReviewSyncAction {
   UPLOAD_ATTACHMENT
   POLL_REPLIES
   POST_FOLLOWUP_COMMENT
+  POST_MANUAL_SUBMISSION
 }
 
 enum BaReviewSyncStatus {
@@ -876,15 +882,45 @@ model ReleaseReport {
   @@index([projectId, sprintId])
 }
 
+// Configurable AI Release Readiness scoring engine (weights + severity deduction table) -- one
+// row per project, falling back to the documented defaults when absent. Weights are expected to
+// sum to 100 but that's enforced at the application layer, not the DB, so partial/experimental
+// configs never corrupt the table.
+model ReleaseScoringConfig {
+  id                              String   @id @default(cuid())
+  projectId                       String   @unique
+  requirementCoverageWeight       Float    @default(20)
+  testCaseCoverageWeight          Float    @default(15)
+  manualExecutionWeight           Float    @default(20)
+  automationExecutionWeight       Float    @default(20)
+  bugRiskWeight                   Float    @default(25)
+  // Per-severity point deduction applied to the bug-risk component for each open defect of that
+  // severity, e.g. { "BLOCKER": -100, "CRITICAL": -40, "HIGH": -20, "MAJOR": -10, "MEDIUM": -5,
+  // "MINOR": -2, "TRIVIAL": -1 }.
+  severityDeductions              Json
+  manualPassRateBlockThreshold    Float    @default(90)
+  automationCoverageWarnThreshold Float    @default(70)
+  updatedAt                       DateTime @updatedAt
+  createdAt                       DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
 // ============================================================================
 // Defect Intelligence (Phase 2 — schema defined now)
 // ============================================================================
 
+// 7-level severity model (AI Release Readiness Algorithm's bug-risk deduction table). Replaces
+// the earlier LOW/MEDIUM/HIGH/CRITICAL set -- BLOCKER/MAJOR/MINOR/TRIVIAL added, LOW retired
+// (existing LOW rows are backfilled to MINOR by the migration that introduced this).
 enum DefectSeverity {
-  LOW
-  MEDIUM
-  HIGH
+  BLOCKER
   CRITICAL
+  HIGH
+  MAJOR
+  MEDIUM
+  MINOR
+  TRIVIAL
 }
 
 enum DefectStatus {

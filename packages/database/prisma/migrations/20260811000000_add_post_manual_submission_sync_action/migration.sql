@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "BaReviewSyncAction" ADD VALUE 'POST_MANUAL_SUBMISSION';
