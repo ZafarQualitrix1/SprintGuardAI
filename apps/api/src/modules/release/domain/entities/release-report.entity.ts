@@ -58,6 +58,9 @@ export interface ReleaseReportBreakdown {
   deploymentProbability: number; // 0-100, 0 when BLOCKED
   deploymentLabel: string;
   mandatoryFlags: MandatoryRuleFlag[];
+  // AI Recommendation Panel: deterministic, always-available action items derived from the same
+  // breakdown as the score itself (never a separate AI call, so it can never be "unavailable").
+  recommendations: string[];
 
   // Legacy fields kept for backward compatibility with existing analytics/dashboard readers
   // (apps/web analytics page, prisma-analytics-read.repository averageLatestReadiness).

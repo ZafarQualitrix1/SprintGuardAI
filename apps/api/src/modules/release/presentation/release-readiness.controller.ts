@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
@@ -9,28 +9,18 @@ import { UpdateSprintReleaseGatesCommand } from '../application/commands/update-
 import { GetLatestReleaseReportQuery } from '../application/queries/get-latest-release-report.query';
 import { GetReleaseScoringConfigQuery } from '../application/queries/get-release-scoring-config.query';
 import { GetSprintReleaseGatesQuery } from '../application/queries/get-sprint-release-gates.query';
+import { GetReleaseReportHistoryQuery } from '../application/queries/get-release-report-history.query';
 import { ReleaseReportEntity } from '../domain/entities/release-report.entity';
 import { ReleaseScoringConfigEntity } from '../domain/entities/release-scoring-config.entity';
 import { SprintGates } from '../domain/repositories/release-metrics-read.repository.interface';
 import { ReleaseReportDto } from './dto/release-report.dto';
+import { toReleaseReportDto } from './mappers/release-report-dto.mapper';
 import {
   ReleaseScoringConfigDto,
   SprintReleaseGatesDto,
   UpdateReleaseScoringConfigDto,
   UpdateSprintReleaseGatesDto,
 } from './dto/release-scoring-config.dto';
-
-function toDto(entity: ReleaseReportEntity): ReleaseReportDto {
-  return {
-    id: entity.id,
-    sprintId: entity.sprintId,
-    readinessScore: entity.readinessScore,
-    executiveSummary: entity.executiveSummary,
-    breakdown: entity.breakdown,
-    status: entity.status,
-    createdAt: entity.createdAt.toISOString(),
-  };
-}
 
 function toScoringConfigDto(entity: ReleaseScoringConfigEntity & { isCustomized: boolean }): ReleaseScoringConfigDto {
   return {
@@ -65,7 +55,7 @@ export class ReleaseReadinessController {
     const report = await this.queryBus.execute<GetLatestReleaseReportQuery, ReleaseReportEntity | null>(
       new GetLatestReleaseReportQuery(sprintId),
     );
-    return report ? toDto(report) : null;
+    return report ? toReleaseReportDto(report) : null;
   }
 
   @Post('compute')
@@ -78,7 +68,19 @@ export class ReleaseReadinessController {
     const report = await this.commandBus.execute<ComputeReleaseReadinessCommand, ReleaseReportEntity>(
       new ComputeReleaseReadinessCommand(user.organizationId, sprintId),
     );
-    return toDto(report);
+    return toReleaseReportDto(report);
+  }
+
+  @Get('history')
+  @RequirePermission('release:read')
+  async getHistory(
+    @Param('sprintId') sprintId: string,
+    @Query('limit') limit?: string,
+  ): Promise<ReleaseReportDto[]> {
+    const reports = await this.queryBus.execute<GetReleaseReportHistoryQuery, ReleaseReportEntity[]>(
+      new GetReleaseReportHistoryQuery(sprintId, limit ? Number(limit) : undefined),
+    );
+    return reports.map(toReleaseReportDto);
   }
 
   // Scoring config is stored per-project, but this route stays sprint-scoped to match how the

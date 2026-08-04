@@ -7,6 +7,8 @@ export type UpdateSprintReleaseGatesInput = Partial<SprintReleaseGates>;
 export const releaseApi = {
   get: (sprintId: string) => apiClient.get<ReleaseReport | null>(`/sprints/${sprintId}/release-readiness`),
   compute: (sprintId: string) => apiClient.post<ReleaseReport>(`/sprints/${sprintId}/release-readiness/compute`),
+  getHistory: (sprintId: string, limit = 20) =>
+    apiClient.get<ReleaseReport[]>(`/sprints/${sprintId}/release-readiness/history?limit=${limit}`),
   getScoringConfig: (sprintId: string) =>
     apiClient.get<ReleaseScoringConfig>(`/sprints/${sprintId}/release-readiness/scoring-config`),
   updateScoringConfig: (sprintId: string, input: UpdateReleaseScoringConfigInput) =>

@@ -42,6 +42,7 @@ export class ReleaseReportBreakdownDto {
   @ApiProperty() deploymentProbability!: number;
   @ApiProperty() deploymentLabel!: string;
   @ApiProperty({ type: [MandatoryRuleFlagDto] }) mandatoryFlags!: MandatoryRuleFlagDto[];
+  @ApiProperty({ type: [String] }) recommendations!: string[];
 
   @ApiProperty() coveragePercent!: number;
   @ApiProperty() executionPassRate!: number;

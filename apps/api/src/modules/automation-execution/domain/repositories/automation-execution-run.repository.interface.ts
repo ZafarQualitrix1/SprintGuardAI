@@ -31,6 +31,11 @@ export interface RunCompletedUpdate {
   reportArtifactUrl: string | null;
 }
 
+export interface RunEventContext {
+  organizationId: string;
+  sprintId: string;
+}
+
 export interface IAutomationExecutionRunRepository {
   create(input: CreateAutomationExecutionRunInput): Promise<AutomationExecutionRunEntity>;
   findById(id: string): Promise<AutomationExecutionRunEntity | null>;
@@ -38,4 +43,8 @@ export interface IAutomationExecutionRunRepository {
   markStarted(id: string, update: RunStartedUpdate): Promise<AutomationExecutionRunEntity>;
   markCompleted(id: string, update: RunCompletedUpdate): Promise<AutomationExecutionRunEntity>;
   markCancelled(id: string): Promise<AutomationExecutionRunEntity>;
+  // Resolves the (organizationId, sprintId) a run belongs to via its story -- used only to
+  // publish ReleaseMetricsChangedEvent after a run completes, kept separate from the entity
+  // returned by the other methods so those don't all need an extra story join.
+  getEventContext(runId: string): Promise<RunEventContext | null>;
 }

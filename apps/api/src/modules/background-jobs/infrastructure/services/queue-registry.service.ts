@@ -2,11 +2,20 @@ import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Job } from 'bullmq';
 
-export const QUEUE_NAMES = ['integration-health-check', 'jira-auto-sync', 'jira-auto-sync-scanner'] as const;
+export const QUEUE_NAMES = [
+  'integration-health-check',
+  'jira-auto-sync',
+  'jira-auto-sync-scanner',
+  'release-readiness-recompute',
+] as const;
 export type QueueName = (typeof QUEUE_NAMES)[number];
 
 const SCANNER_REPEAT_JOB_ID = 'jira-auto-sync-scanner-repeat';
 const SCANNER_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+// Real-time recalculation (AI Release Readiness Algorithm): a burst of related changes (e.g.
+// recording several manual executions in a row) should trigger one recompute, not one per change.
+const RELEASE_RECOMPUTE_DEBOUNCE_MS = 8 * 1000;
 
 export interface JobSummary {
   id: string;
@@ -52,6 +61,28 @@ export class QueueRegistryService implements OnModuleDestroy {
       {},
       { repeat: { every: SCANNER_INTERVAL_MS }, jobId: SCANNER_REPEAT_JOB_ID },
     );
+  }
+
+  // Debounced by sprintId: if a delayed/waiting recompute job is already pending for this sprint,
+  // it's removed and replaced so the delay window resets on every new triggering change, instead
+  // of firing once per change. A job already `active` (being processed right now) is left alone --
+  // its own result will still be current enough, and the next triggering event will schedule a
+  // fresh one anyway.
+  async enqueueDebouncedReleaseRecompute(organizationId: string, sprintId: string, reason: string): Promise<void> {
+    const queue = this.getQueue('release-readiness-recompute');
+    const jobId = `release-recompute:${sprintId}`;
+
+    const existing = await queue.getJob(jobId);
+    if (existing) {
+      const state = await existing.getState();
+      if (state === 'delayed' || state === 'waiting') {
+        await existing.remove();
+      } else {
+        return;
+      }
+    }
+
+    await queue.add('recompute', { organizationId, sprintId, reason }, { jobId, delay: RELEASE_RECOMPUTE_DEBOUNCE_MS });
   }
 
   async getCounts(name: QueueName): Promise<Record<string, number>> {

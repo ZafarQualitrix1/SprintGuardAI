@@ -31,4 +31,13 @@ export class PrismaReleaseReportRepository implements IReleaseReportRepository {
     });
     return row ? toReleaseReportEntity(row) : null;
   }
+
+  async findHistoryBySprintId(sprintId: string, limit: number) {
+    const rows = await this.prisma.releaseReport.findMany({
+      where: { sprintId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return rows.reverse().map(toReleaseReportEntity);
+  }
 }

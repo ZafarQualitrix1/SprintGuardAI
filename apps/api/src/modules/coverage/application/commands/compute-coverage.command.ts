@@ -1,5 +1,5 @@
 import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 import {
   COVERAGE_SOURCE_READ_REPOSITORY,
@@ -9,6 +9,7 @@ import { COVERAGE_REPOSITORY, ICoverageRepository } from '../../domain/repositor
 import { CoverageRecommendation, CoverageResultEntity } from '../../domain/entities/coverage.entity';
 import { deriveCoverage } from '../utils/derive-coverage.util';
 import { coverageRecommendationOutputSchema } from '../schemas/coverage-recommendation.schema';
+import { ReleaseMetricsChangedEvent } from '../../../release/domain/events/release-metrics-changed.event';
 
 export class ComputeCoverageCommand {
   constructor(
@@ -23,6 +24,7 @@ export class ComputeCoverageHandler implements ICommandHandler<ComputeCoverageCo
     @Inject(COVERAGE_SOURCE_READ_REPOSITORY) private readonly sourceReadRepository: ICoverageSourceReadRepository,
     @Inject(COVERAGE_REPOSITORY) private readonly coverageRepository: ICoverageRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(command: ComputeCoverageCommand): Promise<CoverageResultEntity> {
@@ -33,6 +35,9 @@ export class ComputeCoverageHandler implements ICommandHandler<ComputeCoverageCo
 
     const { entries, gaps, summary } = deriveCoverage(source);
     await this.coverageRepository.replaceForSprint(source.sprintId, source.projectId, entries, gaps);
+    this.eventBus.publish(
+      new ReleaseMetricsChangedEvent(command.organizationId, source.sprintId, 'coverage-recomputed'),
+    );
 
     // AI recommendations are best-effort and never block the deterministic matrix/gaps/percent --
     // mirrors the Release Guardian Agent's "deterministic core never fails" pattern

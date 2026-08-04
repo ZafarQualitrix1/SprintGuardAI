@@ -1,10 +1,11 @@
 import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
 import {
   AUTOMATION_EXECUTION_RUN_REPOSITORY,
   IAutomationExecutionRunRepository,
 } from '../../domain/repositories/automation-execution-run.repository.interface';
 import { AutomationExecutionRunEntity, AutomationExecutionStatus, AutomationTestResult } from '../../domain/entities/automation-execution-run.entity';
+import { ReleaseMetricsChangedEvent } from '../../../release/domain/events/release-metrics-changed.event';
 
 // The dispatched workflow POSTs twice: once right after checkout (STARTED, so the UI can show
 // "Running" + a deep link to the live GitHub Actions log before results exist), and once at the
@@ -39,6 +40,7 @@ export class ReceiveExecutionCallbackHandler
 {
   constructor(
     @Inject(AUTOMATION_EXECUTION_RUN_REPOSITORY) private readonly runRepository: IAutomationExecutionRunRepository,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(command: ReceiveExecutionCallbackCommand): Promise<AutomationExecutionRunEntity> {
@@ -54,7 +56,7 @@ export class ReceiveExecutionCallbackHandler
       });
     }
 
-    return this.runRepository.markCompleted(command.runId, {
+    const run = await this.runRepository.markCompleted(command.runId, {
       status: command.payload.status,
       totalTests: command.payload.totalTests,
       passedTests: command.payload.passedTests,
@@ -65,5 +67,14 @@ export class ReceiveExecutionCallbackHandler
       errorMessage: command.payload.errorMessage,
       reportArtifactUrl: command.payload.reportArtifactUrl,
     });
+
+    const context = await this.runRepository.getEventContext(command.runId);
+    if (context) {
+      this.eventBus.publish(
+        new ReleaseMetricsChangedEvent(context.organizationId, context.sprintId, 'automation-execution-completed'),
+      );
+    }
+
+    return run;
   }
 }

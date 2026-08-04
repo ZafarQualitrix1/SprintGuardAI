@@ -88,4 +88,16 @@ export class PrismaAutomationExecutionRunRepository implements IAutomationExecut
     });
     return toAutomationExecutionRunEntity(row);
   }
+
+  async getEventContext(runId: string) {
+    const run = await this.prisma.automationExecutionRun.findUnique({
+      where: { id: runId },
+      select: { organizationId: true, storyId: true },
+    });
+    if (!run) return null;
+    // AutomationExecutionRun.storyId is a plain reference, not a Prisma relation (see schema),
+    // so this is a second query rather than an `include`.
+    const story = await this.prisma.story.findUnique({ where: { id: run.storyId }, select: { sprintId: true } });
+    return story ? { organizationId: run.organizationId, sprintId: story.sprintId } : null;
+  }
 }

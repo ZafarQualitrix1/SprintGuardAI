@@ -14,4 +14,6 @@ export interface IReleaseReportRepository {
   /** Each computation is a new row -- release readiness history is append-only (Solution Architecture §2). */
   create(input: CreateReleaseReportInput): Promise<ReleaseReportEntity>;
   findLatestBySprintId(sprintId: string): Promise<ReleaseReportEntity | null>;
+  /** Oldest-first, for trend charts (Pass/Fail Trend, Automation Trend, Coverage Trend, Defect Burndown). */
+  findHistoryBySprintId(sprintId: string, limit: number): Promise<ReleaseReportEntity[]>;
 }

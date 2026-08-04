@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
+import { CommandHandler, EventBus, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../../domain/repositories/story-read.repository.interface';
 import { RequirementEntity } from '../../domain/entities/requirement.entity';
 import { requirementIntelligenceOutputSchema } from '../schemas/requirement-intelligence.schema';
+import { ReleaseMetricsChangedEvent } from '../../../release/domain/events/release-metrics-changed.event';
 
 export class RunRequirementIntelligenceAgentCommand {
   constructor(
@@ -29,6 +30,7 @@ export class RunRequirementIntelligenceAgentHandler
     @Inject(REQUIREMENT_REPOSITORY) private readonly requirementRepository: IRequirementRepository,
     private readonly aiOrchestrationService: AiOrchestrationService,
     private readonly queryBus: QueryBus,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(command: RunRequirementIntelligenceAgentCommand): Promise<RequirementEntity[]> {
@@ -66,6 +68,10 @@ export class RunRequirementIntelligenceAgentHandler
       acceptanceCriteria: requirement.acceptanceCriteria,
     }));
 
-    return this.requirementRepository.replaceForStory(story.id, requirements);
+    const saved = await this.requirementRepository.replaceForStory(story.id, requirements);
+    this.eventBus.publish(
+      new ReleaseMetricsChangedEvent(command.organizationId, story.sprintId, 'requirement-added'),
+    );
+    return saved;
   }
 }

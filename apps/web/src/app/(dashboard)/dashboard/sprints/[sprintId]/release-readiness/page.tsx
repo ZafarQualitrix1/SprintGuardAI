@@ -11,9 +11,22 @@ import { Button } from '@/components/ui/button';
 import { Badge, BadgeProps } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { useComputeReleaseReadiness, useReleaseReport, useReleaseScoringConfig } from '@/features/release/api';
+import {
+  useComputeReleaseReadiness,
+  useReleaseReadinessRealtime,
+  useReleaseReport,
+  useReleaseReportHistory,
+  useReleaseScoringConfig,
+} from '@/features/release/api';
 import { ReleaseGatesCard } from '@/features/release/components/release-gates-card';
 import { ScoringConfigDialog } from '@/features/release/components/scoring-config-dialog';
+import { BugSeverityPieChart } from '@/features/release/components/bug-severity-pie-chart';
+import { RequirementCompletionRing } from '@/features/release/components/requirement-completion-ring';
+import { PassFailTrendChart } from '@/features/release/components/pass-fail-trend-chart';
+import { AutomationTrendChart } from '@/features/release/components/automation-trend-chart';
+import { CoverageTrendHeatmap } from '@/features/release/components/coverage-trend-heatmap';
+import { DefectBurndownChart } from '@/features/release/components/defect-burndown-chart';
+import { AiRecommendationPanel } from '@/features/release/components/ai-recommendation-panel';
 import { ApiError } from '@/lib/api-client';
 import { toast } from '@/hooks/use-toast';
 
@@ -51,9 +64,11 @@ export default function ReleaseReadinessPage() {
   const params = useParams<{ sprintId: string }>();
   const sprintId = params.sprintId;
   const { data: report, isLoading } = useReleaseReport(sprintId);
+  const { data: history } = useReleaseReportHistory(sprintId);
   const { data: scoringConfig } = useReleaseScoringConfig(sprintId);
   const compute = useComputeReleaseReadiness(sprintId);
   const [configOpen, setConfigOpen] = useState(false);
+  useReleaseReadinessRealtime(sprintId);
 
   return (
     <div>
@@ -216,6 +231,68 @@ export default function ReleaseReadinessPage() {
                 <p className="text-xs text-muted-foreground">
                   {report.breakdown.automationPassedCount}/{report.breakdown.automationExecutedCount} passed
                 </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Bug severity distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BugSeverityPieChart openCounts={report.breakdown.bugRisk.openCounts} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Requirement completion</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RequirementCompletionRing
+                  percent={report.breakdown.requirementCoveragePercent}
+                  covered={report.breakdown.coveredRequirements}
+                  total={report.breakdown.totalRequirements}
+                />
+              </CardContent>
+            </Card>
+            <AiRecommendationPanel recommendations={report.breakdown.recommendations} />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Pass/fail trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PassFailTrendChart history={history ?? []} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Automation trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <AutomationTrendChart history={history ?? []} />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Coverage trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CoverageTrendHeatmap history={history ?? []} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Open defects timeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DefectBurndownChart history={history ?? []} />
               </CardContent>
             </Card>
           </div>

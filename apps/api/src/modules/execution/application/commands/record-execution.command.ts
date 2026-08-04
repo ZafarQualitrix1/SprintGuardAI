@@ -1,11 +1,12 @@
 import { Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
 import {
   TEST_CASE_READ_REPOSITORY,
   ITestCaseReadRepository,
 } from '../../domain/repositories/test-case-read.repository.interface';
 import { EXECUTION_REPOSITORY, IExecutionRepository } from '../../domain/repositories/execution.repository.interface';
 import { ExecutionEntity, ExecutionStatus } from '../../domain/entities/execution.entity';
+import { ReleaseMetricsChangedEvent } from '../../../release/domain/events/release-metrics-changed.event';
 
 export class RecordExecutionCommand {
   constructor(
@@ -29,6 +30,7 @@ export class RecordExecutionHandler implements ICommandHandler<RecordExecutionCo
   constructor(
     @Inject(TEST_CASE_READ_REPOSITORY) private readonly testCaseReadRepository: ITestCaseReadRepository,
     @Inject(EXECUTION_REPOSITORY) private readonly executionRepository: IExecutionRepository,
+    private readonly eventBus: EventBus,
   ) {}
 
   async execute(command: RecordExecutionCommand): Promise<ExecutionEntity> {
@@ -37,7 +39,7 @@ export class RecordExecutionHandler implements ICommandHandler<RecordExecutionCo
       throw new NotFoundException('Test case not found');
     }
 
-    return this.executionRepository.record({
+    const execution = await this.executionRepository.record({
       testCaseId: testCase.id,
       sprintId: testCase.sprintId,
       status: command.status,
@@ -51,5 +53,11 @@ export class RecordExecutionHandler implements ICommandHandler<RecordExecutionCo
       executionDurationMs: command.executionDurationMs,
       testerName: command.testerName,
     });
+
+    this.eventBus.publish(
+      new ReleaseMetricsChangedEvent(command.organizationId, testCase.sprintId, 'execution-recorded'),
+    );
+
+    return execution;
   }
 }

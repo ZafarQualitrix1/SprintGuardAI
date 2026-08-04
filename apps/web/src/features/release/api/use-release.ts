@@ -15,7 +15,18 @@ export function useComputeReleaseReadiness(sprintId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => releaseApi.compute(sprintId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['release', sprintId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['release', sprintId] });
+      queryClient.invalidateQueries({ queryKey: ['release-history', sprintId] });
+    },
+  });
+}
+
+export function useReleaseReportHistory(sprintId: string, limit = 20) {
+  return useQuery({
+    queryKey: ['release-history', sprintId, limit],
+    queryFn: () => releaseApi.getHistory(sprintId, limit),
+    enabled: Boolean(sprintId),
   });
 }
 

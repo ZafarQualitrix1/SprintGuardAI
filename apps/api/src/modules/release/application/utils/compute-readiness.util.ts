@@ -184,6 +184,43 @@ export function computeReleaseReadiness(input: ComputeReleaseReadinessInput): Co
   const deploymentProbability = releaseStatus === 'BLOCKED' ? 0 : readinessScore;
   const deploymentLabel = deploymentLabelFor(releaseStatus, readinessScore);
 
+  // AI Recommendation Panel: ordered most-impactful-first, one line per open gap. Deterministic
+  // and derived from this same breakdown, so unlike the executive summary it never depends on an
+  // AI call succeeding.
+  const recommendations: string[] = [];
+  if (hasBlocker) {
+    recommendations.push(`Resolve ${bugRisk.openCounts.BLOCKER} Blocker defect(s) immediately -- release cannot proceed.`);
+  }
+  if (hasCritical) {
+    recommendations.push(`Resolve ${bugRisk.openCounts.CRITICAL} Critical defect(s) before requesting PM approval.`);
+  }
+  if (bugRisk.openCounts.MAJOR > 0) {
+    recommendations.push(`Close ${bugRisk.openCounts.MAJOR} Major defect(s).`);
+  }
+  if (bugRisk.openCounts.HIGH > 0) {
+    recommendations.push(`Triage ${bugRisk.openCounts.HIGH} High-severity defect(s).`);
+  }
+  if (regressionIncomplete) {
+    recommendations.push('Complete pending regression testing.');
+  }
+  if (manualPending) {
+    recommendations.push(`Execute the remaining ${manualExecution.pendingCount} manual test case(s).`);
+  }
+  if (automationBelowThreshold) {
+    const gap = Math.max(0, Math.round(config.automationCoverageWarnThreshold - automationExecution.passRate));
+    recommendations.push(`Improve automation pass rate by ${gap}% to clear the ${config.automationCoverageWarnThreshold}% threshold.`);
+  }
+  if (requirementIncomplete) {
+    const uncovered = requirementCoverage.totalRequirements - requirementCoverage.coveredRequirements;
+    recommendations.push(`Close requirement coverage gap -- ${uncovered} requirement(s) not yet fully covered.`);
+  }
+  if (checklistIncomplete) {
+    recommendations.push('Complete the deployment checklist.');
+  }
+  if (recommendations.length === 0) {
+    recommendations.push('No outstanding items -- release is in good standing.');
+  }
+
   const breakdown: ReleaseReportBreakdown = {
     requirementCoveragePercent: requirementCoverage.coveragePercent,
     totalRequirements: requirementCoverage.totalRequirements,
@@ -218,6 +255,7 @@ export function computeReleaseReadiness(input: ComputeReleaseReadinessInput): Co
     deploymentProbability,
     deploymentLabel,
     mandatoryFlags,
+    recommendations,
 
     // Legacy aliases for existing readers (analytics dashboard averages, etc.)
     coveragePercent: requirementCoverage.coveragePercent,

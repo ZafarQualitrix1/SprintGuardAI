@@ -46,6 +46,7 @@ export interface ReleaseReportBreakdown {
   deploymentProbability: number;
   deploymentLabel: string;
   mandatoryFlags: MandatoryRuleFlag[];
+  recommendations: string[];
 
   // Legacy aliases kept for older readers (analytics summary cards, etc.)
   coveragePercent: number;
