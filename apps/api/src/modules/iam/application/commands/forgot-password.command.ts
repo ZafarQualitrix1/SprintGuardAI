@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from 'crypto';
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '@sprintguard/database';
@@ -16,6 +16,8 @@ export class ForgotPasswordCommand {
 // standard, low-cost mitigation against using this endpoint to enumerate registered emails.
 @CommandHandler(ForgotPasswordCommand)
 export class ForgotPasswordHandler implements ICommandHandler<ForgotPasswordCommand, void> {
+  private readonly logger = new Logger(ForgotPasswordHandler.name);
+
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
     private readonly prisma: PrismaService,
@@ -46,14 +48,22 @@ export class ForgotPasswordHandler implements ICommandHandler<ForgotPasswordComm
     const webUrl = this.configService.get<string>('app.webUrl');
     const resetLink = `${webUrl}/reset-password?token=${token}`;
 
-    await this.emailSender.send({
-      to: user.email,
-      subject: 'Reset your SprintGuard AI password',
-      html: `
-        <p>We received a request to reset your SprintGuard AI password.</p>
-        <p><a href="${resetLink}">Click here to choose a new password</a>. This link expires in ${RESET_TTL_MINUTES} minutes.</p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-      `,
-    });
+    try {
+      await this.emailSender.send({
+        to: user.email,
+        subject: 'Reset your SprintGuard AI password',
+        html: `
+          <p>We received a request to reset your SprintGuard AI password.</p>
+          <p><a href="${resetLink}">Click here to choose a new password</a>. This link expires in ${RESET_TTL_MINUTES} minutes.</p>
+          <p>If you didn't request this, you can safely ignore this email.</p>
+        `,
+      });
+    } catch (error) {
+      // Same degrade-not-fail contract as InviteMemberHandler: an unconfigured/failing email
+      // provider must never surface as a 500 on a public, unauthenticated endpoint -- that would
+      // itself leak account existence (a request for a registered email 500s; one for an
+      // unregistered email doesn't, since the block above already returned early for it).
+      this.logger.warn(`Could not email password reset link to ${user.email}: ${(error as Error).message}`);
+    }
   }
 }
