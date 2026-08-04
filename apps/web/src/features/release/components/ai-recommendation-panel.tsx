@@ -6,6 +6,11 @@ interface AiRecommendationPanelProps {
 }
 
 export function AiRecommendationPanel({ recommendations }: AiRecommendationPanelProps) {
+  // Defensive: ReleaseReport.breakdown is a JSON blob persisted as-is at compute time. Reports
+  // computed before this field existed have no `recommendations` key at all, so a caller passing
+  // that stale data straight through (report.breakdown.recommendations) hands us undefined here.
+  const items = Array.isArray(recommendations) ? recommendations : [];
+
   return (
     <Card>
       <CardHeader>
@@ -16,7 +21,7 @@ export function AiRecommendationPanel({ recommendations }: AiRecommendationPanel
       </CardHeader>
       <CardContent>
         <ul className="space-y-2">
-          {recommendations.map((recommendation, index) => (
+          {items.map((recommendation, index) => (
             <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
               <span>{recommendation}</span>
