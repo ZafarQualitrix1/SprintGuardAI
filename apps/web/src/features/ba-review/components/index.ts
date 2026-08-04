@@ -9,3 +9,4 @@ export * from './sync-status-indicator';
 export * from './ba-assignment-field';
 export * from './jira-user-picker';
 export * from './submit-for-review-dialog';
+export * from './test-artifacts-panel';

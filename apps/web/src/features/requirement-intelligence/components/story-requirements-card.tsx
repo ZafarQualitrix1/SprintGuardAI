@@ -57,12 +57,12 @@ export function StoryRequirementsCard({ story }: StoryRequirementsCardProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">{story.title}</CardTitle>
+      <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <CardTitle className="truncate text-base">{story.title}</CardTitle>
           {baStatus ? <BaReviewStatusBadge status={baStatus.status} reviewCycleCount={baStatus.reviewCycleCount} /> : null}
         </div>
-        <Button size="sm" onClick={onAnalyze} disabled={disabled} title={disabledReason}>
+        <Button size="sm" onClick={onAnalyze} disabled={disabled} title={disabledReason} className="shrink-0">
           <Sparkles className="mr-2 h-4 w-4" />
           {generate.isPending ? 'Analyzing…' : report ? 'Re-analyze' : 'Analyze story'}
         </Button>

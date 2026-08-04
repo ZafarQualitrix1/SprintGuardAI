@@ -190,12 +190,12 @@ export function StoryTestGeneratorCard({ story }: StoryTestGeneratorCardProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-base">{story.title}</CardTitle>
+      <CardHeader className="flex flex-col gap-3 space-y-0 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-2">
+          <CardTitle className="truncate text-base">{story.title}</CardTitle>
           {baStatus ? <BaReviewStatusBadge status={baStatus.status} reviewCycleCount={baStatus.reviewCycleCount} /> : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"

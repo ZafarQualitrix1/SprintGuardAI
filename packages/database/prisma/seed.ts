@@ -304,7 +304,7 @@ async function main() {
   const PROMPTS = [
     {
       capability: 'requirement-intelligence',
-      name: 'Requirement Intelligence',
+      name: 'Story Analysis',
       description: 'Extracts functional/non-functional requirements and Given/When/Then acceptance criteria from a story.',
       category: 'Requirement Intelligence',
       template: [
@@ -352,7 +352,7 @@ async function main() {
     },
     {
       capability: 'test-scenario',
-      name: 'Test Scenario Generation',
+      name: 'Test Scenarios',
       description: 'Generates distinct test scenarios (happy path + edge cases) from a single acceptance criterion.',
       category: 'Test Scenario Generation',
       template: [
@@ -387,7 +387,7 @@ async function main() {
     },
     {
       capability: 'test-case',
-      name: 'Test Case Generation',
+      name: 'Test Cases',
       description: 'Expands a test scenario into an executable test case with concrete steps and expected results.',
       category: 'Test Case Generation',
       template: [
@@ -473,7 +473,7 @@ async function main() {
     },
     {
       capability: 'playwright-api-automation',
-      name: 'Playwright API Automation Generation',
+      name: 'API Automation',
       description: 'Generates an enterprise Playwright TypeScript API test spec for one automatable test case.',
       category: 'Automation Generation',
       template: [
@@ -525,7 +525,7 @@ async function main() {
     },
     {
       capability: 'playwright-ui-automation',
-      name: 'Playwright UI Automation Generation',
+      name: 'UI Automation',
       description: 'Generates an enterprise Playwright TypeScript Page Object + UI test spec for one automatable test case.',
       category: 'Automation Generation',
       template: [
@@ -604,7 +604,7 @@ async function main() {
     },
     {
       capability: 'release-readiness-summary',
-      name: 'Release Readiness Executive Summary',
+      name: 'Release Summary',
       description: 'Writes an executive narrative summary and highlights from computed release readiness metrics.',
       category: 'Release Readiness',
       template: [
@@ -638,7 +638,7 @@ async function main() {
     },
     {
       capability: 'coverage-recommendation',
-      name: 'Coverage Gap Recommendation',
+      name: 'Coverage Gaps',
       description: 'Reviews computed coverage gaps and suggests additional test scenarios to close them.',
       category: 'Coverage Analysis',
       template: [
@@ -682,7 +682,7 @@ async function main() {
     },
     {
       capability: 'deep-requirement-analysis',
-      name: 'Deep Requirement Analysis',
+      name: 'Deep Analysis',
       description: 'Full BA/QA-architect analysis of a Jira story: risks, edge cases, API/DB/UI impact, enterprise test cases, and self-assessed coverage.',
       category: 'Deep Requirement Analysis',
       template: [
@@ -813,7 +813,7 @@ async function main() {
     },
     {
       capability: 'test-case-improvement',
-      name: 'Test Case Improvement (BA Feedback Merge)',
+      name: 'Feedback Merge',
       description: 'Merges a Business Analyst\'s Jira reply with the existing test-case baseline into a targeted add/modify/remove changeset.',
       category: 'BA Review Workflow',
       template: [
@@ -882,7 +882,7 @@ async function main() {
     },
     {
       capability: 'ba-review-submission-summary',
-      name: 'BA Review Submission Summary',
+      name: 'BA Review Submission',
       description: 'Drafts a short, editable summary of a story\'s test cases for the Submit for Review modal.',
       category: 'BA Review Workflow',
       template: [

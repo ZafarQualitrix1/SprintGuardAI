@@ -9,8 +9,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ApiError } from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSprint } from '@/features/sprint/api';
-import { StoryRequirementsCard } from '@/features/requirement-intelligence/components/story-requirements-card';
-import { StoryTestGeneratorCard } from '@/features/test-intelligence/components/story-test-generator-card';
 import { useBaReviewStatus } from '@/features/ba-review/api';
 import {
   AuditTrailPanel,
@@ -18,11 +16,14 @@ import {
   LockBadge,
   ReviewCommentThread,
   ReviewTimeline,
+  TestArtifactsPanel,
 } from '@/features/ba-review/components';
 
-// The real per-story detail page -- previously a "Coming soon" stub. Brings together the existing
-// Requirements/Test Generator cards with the BA Review Workflow's governance panels (Status,
-// Timeline, Lock badge) that don't fit cleanly on the scattered per-sprint list pages anymore.
+// The BA Review page for a single story: governance status/actions on one side, and what's
+// actually being reviewed (the generated test scenarios/cases) on the other. Deliberately doesn't
+// duplicate the Analyze/Generate actions that already have dedicated homes on the Requirements and
+// Test Generator tabs -- this page is about reviewing and submitting what's already there, not
+// generating it.
 export default function StoryDetailPage() {
   const params = useParams<{ sprintId: string; storyId: string }>();
   const user = useAuthStore((s) => s.user);
@@ -66,16 +67,10 @@ export default function StoryDetailPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
-          <StoryRequirementsCard story={story} />
-          <StoryTestGeneratorCard story={story} />
+          <TestArtifactsPanel storyId={story.id} storyTitle={story.title} />
         </div>
         <div className="space-y-4">
-          <BaReviewStatusPanel
-            storyId={story.id}
-            storyTitle={story.title}
-            canApprove={canApprove}
-            canAdminUnlock={canAdminUnlock}
-          />
+          <BaReviewStatusPanel storyId={story.id} canApprove={canApprove} canAdminUnlock={canAdminUnlock} />
           <ReviewTimeline storyId={story.id} />
           <ReviewCommentThread storyId={story.id} />
           <AuditTrailPanel storyId={story.id} />
