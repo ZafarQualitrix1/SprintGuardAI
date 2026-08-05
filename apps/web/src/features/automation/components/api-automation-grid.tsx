@@ -1,6 +1,6 @@
 'use client';
 
-import { Bookmark, Download, Eye, Play, RefreshCw, Sparkles } from 'lucide-react';
+import { Bookmark, Download, Eye, History, Play, RefreshCw, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
@@ -46,6 +46,7 @@ interface ApiAutomationGridProps {
   onSelectionChange: (keys: Set<string>) => void;
   onPreview: (automationGenerationId: string) => void;
   onRun: (candidate: ApprovedApiAutomationCandidate) => void;
+  onVersionHistory: (candidate: ApprovedApiAutomationCandidate) => void;
   // Runs triggered so far this session, keyed by testCaseId -- the candidates list itself doesn't
   // carry execution history (that lives in a separate story-scoped table), so this is best-effort:
   // it reflects what's been run since the page loaded, not full persisted history.
@@ -59,6 +60,7 @@ export function ApiAutomationGrid({
   onSelectionChange,
   onPreview,
   onRun,
+  onVersionHistory,
   latestRunByTestCaseId,
 }: ApiAutomationGridProps) {
   const generate = useGenerateApiAutomation();
@@ -222,6 +224,9 @@ export function ApiAutomationGrid({
               </Button>
               <Button size="sm" variant="ghost" onClick={() => onRun(c)} title="Run automation">
                 <Play className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onVersionHistory(c)} title="Version history">
+                <History className="h-3.5 w-3.5" />
               </Button>
             </>
           ) : null}

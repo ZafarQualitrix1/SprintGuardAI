@@ -18,6 +18,7 @@ import {
   ApiAutomationFilters,
   ApiAutomationGrid,
   AutomationPreviewDialog,
+  AutomationVersionHistoryDialog,
   ExecutionProgressPanel,
   RunAutomationDialog,
   type RunnableAutomationItem,
@@ -36,6 +37,7 @@ export default function ApiAutomationPage() {
   const [runItems, setRunItems] = useState<RunnableAutomationItem[] | null>(null);
   const [trackedRuns, setTrackedRuns] = useState<TrackedExecutionRun[]>([]);
   const [liveRunByTestCaseId, setLiveRunByTestCaseId] = useState<Map<string, AutomationExecutionRun>>(new Map());
+  const [historyCandidate, setHistoryCandidate] = useState<ApprovedApiAutomationCandidate | null>(null);
 
   const { data: candidates, isLoading } = useApprovedApiAutomationCandidates({
     projectId: projectId ?? undefined,
@@ -237,6 +239,7 @@ export default function ApiAutomationPage() {
                 onSelectionChange={setSelected}
                 onPreview={setPreviewId}
                 onRun={onRunSingle}
+                onVersionHistory={setHistoryCandidate}
                 latestRunByTestCaseId={liveRunByTestCaseId}
               />
             </>
@@ -251,6 +254,13 @@ export default function ApiAutomationPage() {
         onOpenChange={(open) => !open && setRunItems(null)}
         items={runItems ?? []}
         onTriggered={onTriggered}
+      />
+
+      <AutomationVersionHistoryDialog
+        testCaseId={historyCandidate?.testCaseId ?? null}
+        testCaseLabel={historyCandidate?.testCaseTitle ?? ''}
+        onOpenChange={(open) => !open && setHistoryCandidate(null)}
+        onPreview={setPreviewId}
       />
 
       <AutomationPreviewDialog automationGenerationId={previewId} onOpenChange={(open) => !open && setPreviewId(null)} />
