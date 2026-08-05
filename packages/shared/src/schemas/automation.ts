@@ -18,6 +18,7 @@ export interface AutomationGeneration {
   requiredPreconditions: string[];
   missingRequirementDetails: string[];
   createdAt: string;
+  isOutdated: boolean;
 }
 
 export interface AutomationGenerationDetail extends AutomationGeneration {
@@ -37,4 +38,23 @@ export interface AutomationCandidate {
   uiScreen: string | null;
   latestApi: AutomationGeneration | null;
   latestUi: AutomationGeneration | null;
+}
+
+// API Automation module's grid row -- BA-approved+locked, API-type candidates only, org-wide
+// (Project -> Sprint -> Story filterable), distinct from AutomationCandidate (the old per-sprint
+// tab's shape) since this carries the extra columns the module's grid needs.
+export interface ApprovedApiAutomationCandidate {
+  testCaseId: string;
+  displayId: string | null;
+  testCaseTitle: string;
+  storyId: string;
+  storyExternalId: string | null;
+  storyTitle: string;
+  apiEndpoint: string | null;
+  requestMethod: string | null;
+  priority: string;
+  automationStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  latestGeneration: AutomationGeneration | null;
 }
