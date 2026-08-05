@@ -3,13 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { automationApi, ApprovedApiAutomationCandidateFilters } from './automation.api';
 
-export function useAutomationCandidates(sprintId: string) {
-  return useQuery({
-    queryKey: ['automation', 'candidates', sprintId],
-    queryFn: () => automationApi.listCandidates(sprintId),
-  });
-}
-
 // API Automation module -- filters are the Project -> Sprint -> Story cascade; an empty object
 // filters nothing (org-wide), which the page never actually does since a project must be selected
 // first, but the query itself doesn't require it.
@@ -33,29 +26,6 @@ export function useAutomationDetail(automationGenerationId: string | null) {
     queryKey: ['automation', 'detail', automationGenerationId],
     queryFn: () => automationApi.detail(automationGenerationId as string),
     enabled: Boolean(automationGenerationId),
-  });
-}
-
-export function useGenerateAutomation(sprintId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ testCaseId, automationType }: { testCaseId: string; automationType: 'API' | 'UI' }) =>
-      automationApi.generate(testCaseId, automationType),
-    onSuccess: (_result, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['automation', 'candidates', sprintId] });
-      queryClient.invalidateQueries({ queryKey: ['automation', 'by-test-case', variables.testCaseId] });
-    },
-  });
-}
-
-export function useSaveAutomation(sprintId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (automationGenerationId: string) => automationApi.save(automationGenerationId),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['automation', 'candidates', sprintId] });
-      queryClient.invalidateQueries({ queryKey: ['automation', 'detail', result.id] });
-    },
   });
 }
 
