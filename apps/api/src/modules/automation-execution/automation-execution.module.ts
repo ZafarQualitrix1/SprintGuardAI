@@ -10,6 +10,7 @@ import { AUTOMATION_RUN_CONTEXT_READ_REPOSITORY } from './domain/repositories/au
 import { PrismaAutomationExecutionRunRepository } from './infrastructure/repositories/prisma-automation-execution-run.repository';
 import { PrismaAutomationRunContextReadRepository } from './infrastructure/repositories/prisma-automation-run-context-read.repository';
 import { GithubActionsService } from './infrastructure/services/github-actions.service';
+import { ExecutionReportService } from './application/services/execution-report.service';
 
 // Bounded context module: Automation Execution (Enterprise Sprint Quality Platform §9/§10/§11).
 // Dispatches .github/workflows/automation-execution.yml via workflow_dispatch to actually run the
@@ -21,6 +22,7 @@ import { GithubActionsService } from './infrastructure/services/github-actions.s
     ...AUTOMATION_EXECUTION_COMMAND_HANDLERS,
     ...AUTOMATION_EXECUTION_QUERY_HANDLERS,
     GithubActionsService,
+    ExecutionReportService,
     { provide: AUTOMATION_EXECUTION_RUN_REPOSITORY, useClass: PrismaAutomationExecutionRunRepository },
     { provide: AUTOMATION_RUN_CONTEXT_READ_REPOSITORY, useClass: PrismaAutomationRunContextReadRepository },
   ],

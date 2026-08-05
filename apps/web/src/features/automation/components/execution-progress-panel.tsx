@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAutomationExecutionRun } from '@/features/automation-execution/api';
+import { ExecutionReportDownloads } from '@/features/automation-execution/components';
 import type { AutomationExecutionRun } from '@sprintguard/shared';
 
 const STEPS = ['Preparing…', 'Installing dependencies…', 'Loading environment…', 'Executing tests…', 'Generating report…'];
@@ -88,9 +89,14 @@ function RunProgressCard({
           </span>
         ) : null}
         {run.githubRunUrl ? (
-          <a href={run.githubRunUrl} target="_blank" rel="noreferrer" className="ml-auto text-primary hover:underline">
+          <a href={run.githubRunUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
             View run →
           </a>
+        ) : null}
+        {isTerminal ? (
+          <div className="ml-auto">
+            <ExecutionReportDownloads run={run} />
+          </div>
         ) : null}
       </div>
     </div>

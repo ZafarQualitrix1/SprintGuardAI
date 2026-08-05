@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
@@ -8,8 +9,12 @@ import { CancelAutomationExecutionCommand } from '../application/commands/cancel
 import { GetAutomationExecutionRunQuery } from '../application/queries/get-automation-execution-run.query';
 import { ListAutomationExecutionRunsByStoryQuery } from '../application/queries/list-automation-execution-runs-by-story.query';
 import { AutomationExecutionRunEntity } from '../domain/entities/automation-execution-run.entity';
+import { ExecutionReportService } from '../application/services/execution-report.service';
 import { AutomationExecutionRunDto, TriggerAutomationExecutionDto } from './dto';
 import { toAutomationExecutionRunDto } from './automation-execution.presenter';
+
+type ReportFormat = 'excel' | 'extent' | 'junit';
+const REPORT_FORMATS: ReportFormat[] = ['excel', 'extent', 'junit'];
 
 @ApiTags('Automation Execution')
 @Controller('stories/:storyId/automation-execution')
@@ -58,6 +63,7 @@ export class AutomationExecutionController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly reportService: ExecutionReportService,
   ) {}
 
   @Get(':id')
@@ -67,6 +73,45 @@ export class AutomationExecutionController {
       new GetAutomationExecutionRunQuery(id),
     );
     return toAutomationExecutionRunDto(run);
+  }
+
+  // HTML (the GitHub Actions artifact, via reportArtifactUrl) and JSON (the run's own detail
+  // response above) need no dedicated route -- only these three formats are actually generated
+  // server-side, from data already persisted on the run row (see ExecutionReportService's doc
+  // comment for why this doesn't re-parse Playwright's native report output).
+  @Get(':id/report')
+  @RequirePermission('automation:read')
+  async report(
+    @Param('id') id: string,
+    @Query('format') format: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<Buffer | string> {
+    if (!REPORT_FORMATS.includes(format as ReportFormat)) {
+      throw new BadRequestException(`format must be one of: ${REPORT_FORMATS.join(', ')}`);
+    }
+    const run = await this.queryBus.execute<GetAutomationExecutionRunQuery, AutomationExecutionRunEntity>(
+      new GetAutomationExecutionRunQuery(id),
+    );
+
+    if (format === 'excel') {
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="automation-report-${run.id}.xlsx"`,
+      });
+      return this.reportService.buildExcelWorkbook(run);
+    }
+    if (format === 'extent') {
+      res.set({
+        'Content-Type': 'text/html',
+        'Content-Disposition': `attachment; filename="automation-report-${run.id}.html"`,
+      });
+      return this.reportService.buildExtentStyleHtmlReport(run);
+    }
+    res.set({
+      'Content-Type': 'application/xml',
+      'Content-Disposition': `attachment; filename="automation-report-${run.id}.xml"`,
+    });
+    return this.reportService.buildJunitXml(run);
   }
 
   @Post(':id/cancel')
