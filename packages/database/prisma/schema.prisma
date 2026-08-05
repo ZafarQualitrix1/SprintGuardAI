@@ -568,6 +568,11 @@ model AutomationGeneration {
   generatedByAgentRunId     String?
   createdBy                 String?
   createdAt                 DateTime                   @default(now())
+  // API Automation (§Regenerate Automation): set true when the source test case is regenerated
+  // after this automation was saved (e.g. admin-unlock -> BA-feedback-driven regeneration) -- the
+  // generated code may no longer match the test case's steps/endpoint/payload. Never cleared
+  // automatically; only a fresh GenerateAutomationCommand call (a new version) supersedes it.
+  isOutdated                Boolean                    @default(false)
 
   testCase      TestCase                 @relation(fields: [testCaseId], references: [id], onDelete: Cascade)
   executionRuns AutomationExecutionRun[]
