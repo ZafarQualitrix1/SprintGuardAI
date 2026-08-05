@@ -1,6 +1,6 @@
 'use client';
 
-import { Bookmark, Download, Eye, RefreshCw, Sparkles } from 'lucide-react';
+import { Bookmark, Download, Eye, Play, RefreshCw, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DataTable, DataTableColumn } from '@/components/ui/data-table';
@@ -8,7 +8,16 @@ import { toast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api-client';
 import { automationApi, useGenerateApiAutomation, useSaveApiAutomation } from '@/features/automation/api';
 import { downloadFilesAsZip, slugify } from '@/features/automation/lib/download-framework';
-import type { ApprovedApiAutomationCandidate } from '@sprintguard/shared';
+import type { ApprovedApiAutomationCandidate, AutomationExecutionRun } from '@sprintguard/shared';
+
+const EXECUTION_STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'success' | 'destructive' | 'warning'> = {
+  QUEUED: 'secondary',
+  RUNNING: 'default',
+  PASSED: 'success',
+  FAILED: 'destructive',
+  ERROR: 'destructive',
+  CANCELLED: 'warning',
+};
 
 const priorityVariant: Record<string, 'default' | 'secondary' | 'warning' | 'destructive'> = {
   LOW: 'secondary',
@@ -36,6 +45,11 @@ interface ApiAutomationGridProps {
   selected: Set<string>;
   onSelectionChange: (keys: Set<string>) => void;
   onPreview: (automationGenerationId: string) => void;
+  onRun: (candidate: ApprovedApiAutomationCandidate) => void;
+  // Runs triggered so far this session, keyed by testCaseId -- the candidates list itself doesn't
+  // carry execution history (that lives in a separate story-scoped table), so this is best-effort:
+  // it reflects what's been run since the page loaded, not full persisted history.
+  latestRunByTestCaseId: Map<string, AutomationExecutionRun>;
 }
 
 export function ApiAutomationGrid({
@@ -44,6 +58,8 @@ export function ApiAutomationGrid({
   selected,
   onSelectionChange,
   onPreview,
+  onRun,
+  latestRunByTestCaseId,
 }: ApiAutomationGridProps) {
   const generate = useGenerateApiAutomation();
   const save = useSaveApiAutomation();
@@ -146,8 +162,14 @@ export function ApiAutomationGrid({
     {
       key: 'executionStatus',
       header: 'Execution Status',
-      // Wired up once execution results are surfaced per test case (Phase 5).
-      render: () => <span className="text-xs text-muted-foreground">—</span>,
+      render: (c) => {
+        const run = latestRunByTestCaseId.get(c.testCaseId);
+        return run ? (
+          <Badge variant={EXECUTION_STATUS_VARIANT[run.status] ?? 'secondary'}>{run.status}</Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">Not Run</span>
+        );
+      },
     },
     {
       key: 'createdAt',
@@ -197,6 +219,9 @@ export function ApiAutomationGrid({
                 title="Save automation"
               >
                 <Bookmark className="h-3.5 w-3.5" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => onRun(c)} title="Run automation">
+                <Play className="h-3.5 w-3.5" />
               </Button>
             </>
           ) : null}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Bookmark, Download, Search, Sparkles } from 'lucide-react';
+import { Bookmark, Download, Play, Search, Sparkles } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,16 @@ import {
   useSaveApiAutomation,
 } from '@/features/automation/api';
 import { downloadFilesAsZip, slugify } from '@/features/automation/lib/download-framework';
-import { ApiAutomationFilters, ApiAutomationGrid, AutomationPreviewDialog } from '@/features/automation/components';
+import {
+  ApiAutomationFilters,
+  ApiAutomationGrid,
+  AutomationPreviewDialog,
+  ExecutionProgressPanel,
+  RunAutomationDialog,
+  type RunnableAutomationItem,
+  type TrackedExecutionRun,
+} from '@/features/automation/components';
+import type { ApprovedApiAutomationCandidate, AutomationExecutionRun } from '@sprintguard/shared';
 
 export default function ApiAutomationPage() {
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -24,6 +33,9 @@ export default function ApiAutomationPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [bulkWorking, setBulkWorking] = useState(false);
+  const [runItems, setRunItems] = useState<RunnableAutomationItem[] | null>(null);
+  const [trackedRuns, setTrackedRuns] = useState<TrackedExecutionRun[]>([]);
+  const [liveRunByTestCaseId, setLiveRunByTestCaseId] = useState<Map<string, AutomationExecutionRun>>(new Map());
 
   const { data: candidates, isLoading } = useApprovedApiAutomationCandidates({
     projectId: projectId ?? undefined,
@@ -117,6 +129,57 @@ export default function ApiAutomationPage() {
     toast({ title: 'Bulk save complete', description: `${saved} saved` });
   };
 
+  const toRunnableItem = (candidate: ApprovedApiAutomationCandidate): RunnableAutomationItem | null =>
+    candidate.latestGeneration
+      ? {
+          testCaseId: candidate.testCaseId,
+          storyId: candidate.storyId,
+          generationId: candidate.latestGeneration.id,
+          label: candidate.testCaseTitle,
+        }
+      : null;
+
+  const onRunSingle = (candidate: ApprovedApiAutomationCandidate) => {
+    const item = toRunnableItem(candidate);
+    if (!item) return;
+    setRunItems([item]);
+  };
+
+  const onBulkRun = () => {
+    const items = selectedCandidates.map(toRunnableItem).filter((item): item is RunnableAutomationItem => item !== null);
+    if (items.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Nothing to run',
+        description: 'Generate automation for the selected test cases first.',
+      });
+      return;
+    }
+    setRunItems(items);
+  };
+
+  const onTriggered = (runs: { testCaseId: string; label: string; run: AutomationExecutionRun }[]) => {
+    setTrackedRuns((prev) => {
+      const byTestCaseId = new Map(prev.map((r) => [r.testCaseId, r]));
+      for (const r of runs) byTestCaseId.set(r.testCaseId, { testCaseId: r.testCaseId, label: r.label, runId: r.run.id });
+      return Array.from(byTestCaseId.values());
+    });
+    setLiveRunByTestCaseId((prev) => {
+      const next = new Map(prev);
+      for (const r of runs) next.set(r.testCaseId, r.run);
+      return next;
+    });
+  };
+
+  const onRunUpdate = (testCaseId: string, run: AutomationExecutionRun) => {
+    setLiveRunByTestCaseId((prev) => {
+      if (prev.get(testCaseId)?.status === run.status && prev.get(testCaseId)?.id === run.id) return prev;
+      const next = new Map(prev);
+      next.set(testCaseId, run);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -160,6 +223,10 @@ export default function ApiAutomationPage() {
                     <Bookmark className="mr-1.5 h-3.5 w-3.5" />
                     Save Automation
                   </Button>
+                  <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkWorking} onClick={onBulkRun}>
+                    <Play className="mr-1.5 h-3.5 w-3.5" />
+                    Run Automation
+                  </Button>
                 </div>
               </div>
 
@@ -169,11 +236,22 @@ export default function ApiAutomationPage() {
                 selected={selected}
                 onSelectionChange={setSelected}
                 onPreview={setPreviewId}
+                onRun={onRunSingle}
+                latestRunByTestCaseId={liveRunByTestCaseId}
               />
             </>
           )}
         </CardContent>
       </Card>
+
+      <ExecutionProgressPanel runs={trackedRuns} onRunUpdate={onRunUpdate} />
+
+      <RunAutomationDialog
+        open={runItems !== null}
+        onOpenChange={(open) => !open && setRunItems(null)}
+        items={runItems ?? []}
+        onTriggered={onTriggered}
+      />
 
       <AutomationPreviewDialog automationGenerationId={previewId} onOpenChange={(open) => !open && setPreviewId(null)} />
     </div>
