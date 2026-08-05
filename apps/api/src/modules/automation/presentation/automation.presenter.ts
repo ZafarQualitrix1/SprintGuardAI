@@ -1,6 +1,12 @@
 import { AutomationGenerationEntity } from '../domain/entities/automation-generation.entity';
 import { AutomationCandidateResult } from '../application/queries/list-automation-candidates-by-sprint.query';
-import { AutomationCandidateDto, AutomationGenerationDetailDto, AutomationGenerationDto } from './dto/automation.dto';
+import { ApprovedApiAutomationCandidateResult } from '../application/queries/list-approved-api-automation-candidates.query';
+import {
+  ApprovedApiAutomationCandidateDto,
+  AutomationCandidateDto,
+  AutomationGenerationDetailDto,
+  AutomationGenerationDto,
+} from './dto/automation.dto';
 
 export function toAutomationGenerationDto(entity: AutomationGenerationEntity): AutomationGenerationDto {
   return {
@@ -18,6 +24,7 @@ export function toAutomationGenerationDto(entity: AutomationGenerationEntity): A
     requiredPreconditions: entity.requiredPreconditions,
     missingRequirementDetails: entity.missingRequirementDetails,
     createdAt: entity.createdAt.toISOString(),
+    isOutdated: entity.isOutdated,
   };
 }
 
@@ -39,5 +46,25 @@ export function toAutomationCandidateDto(result: AutomationCandidateResult): Aut
     uiScreen: result.testCase.uiScreen,
     latestApi: result.latestApi ? toAutomationGenerationDto(result.latestApi) : null,
     latestUi: result.latestUi ? toAutomationGenerationDto(result.latestUi) : null,
+  };
+}
+
+export function toApprovedApiAutomationCandidateDto(
+  result: ApprovedApiAutomationCandidateResult,
+): ApprovedApiAutomationCandidateDto {
+  return {
+    testCaseId: result.testCase.id,
+    displayId: result.testCase.displayId,
+    testCaseTitle: result.testCase.title,
+    storyId: result.testCase.storyId,
+    storyExternalId: result.testCase.storyExternalId,
+    storyTitle: result.testCase.storyTitle,
+    apiEndpoint: result.testCase.apiEndpoint,
+    requestMethod: result.testCase.requestMethod,
+    priority: result.testCase.priority,
+    automationStatus: result.testCase.automationStatus,
+    createdAt: result.testCase.createdAt.toISOString(),
+    updatedAt: result.testCase.updatedAt.toISOString(),
+    latestGeneration: result.latestGeneration ? toAutomationGenerationDto(result.latestGeneration) : null,
   };
 }

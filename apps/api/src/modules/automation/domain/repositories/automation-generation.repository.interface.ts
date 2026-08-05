@@ -26,4 +26,10 @@ export interface IAutomationGenerationRepository {
   /** One DB round trip for the whole sprint's Automation tab list -- avoids N+1 per test case. */
   listLatestForTestCaseIds(testCaseIds: string[]): Promise<AutomationGenerationEntity[]>;
   markSaved(id: string): Promise<AutomationGenerationEntity>;
+  /**
+   * Flags every AutomationGeneration for the given test cases as outdated -- called when a locked
+   * story's test cases get regenerated (e.g. admin-unlock -> BA-feedback-driven regeneration), since
+   * the previously-generated automation code may no longer match the test case's current content.
+   */
+  markOutdatedForTestCaseIds(testCaseIds: string[]): Promise<void>;
 }

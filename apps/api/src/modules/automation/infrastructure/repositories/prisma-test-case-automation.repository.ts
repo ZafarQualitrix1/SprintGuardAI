@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@sprintguard/database';
 import {
+  AutomationCandidateFilters,
   ITestCaseAutomationRepository,
   TestCaseAutomationContext,
 } from '../../domain/repositories/test-case-automation.repository.interface';
 
 const SELECT = {
   id: true,
+  displayId: true,
   title: true,
   description: true,
   steps: true,
@@ -16,19 +18,23 @@ const SELECT = {
   automationStatus: true,
   automationType: true,
   apiEndpoint: true,
+  requestMethod: true,
   uiScreen: true,
+  createdAt: true,
+  updatedAt: true,
   testScenario: {
     select: {
       id: true,
       title: true,
       storyId: true,
-      story: { select: { id: true, title: true, sprintId: true } },
+      story: { select: { id: true, externalId: true, title: true, sprintId: true } },
     },
   },
 } as const;
 
 type TestCaseRow = {
   id: string;
+  displayId: string | null;
   title: string;
   description: string | null;
   steps: unknown;
@@ -38,13 +44,22 @@ type TestCaseRow = {
   automationStatus: string;
   automationType: string;
   apiEndpoint: string | null;
+  requestMethod: string | null;
   uiScreen: string | null;
-  testScenario: { id: string; title: string; storyId: string; story: { id: string; title: string; sprintId: string } };
+  createdAt: Date;
+  updatedAt: Date;
+  testScenario: {
+    id: string;
+    title: string;
+    storyId: string;
+    story: { id: string; externalId: string | null; title: string; sprintId: string };
+  };
 };
 
 function toContext(row: TestCaseRow): TestCaseAutomationContext {
   return {
     id: row.id,
+    displayId: row.displayId,
     title: row.title,
     description: row.description,
     steps: row.steps as unknown as { step: string; expected: string }[],
@@ -54,12 +69,31 @@ function toContext(row: TestCaseRow): TestCaseAutomationContext {
     automationStatus: row.automationStatus,
     automationType: row.automationType,
     apiEndpoint: row.apiEndpoint,
+    requestMethod: row.requestMethod,
     uiScreen: row.uiScreen,
     storyId: row.testScenario.story.id,
+    storyExternalId: row.testScenario.story.externalId,
     storyTitle: row.testScenario.story.title,
     scenarioId: row.testScenario.id,
     scenarioTitle: row.testScenario.title,
     sprintId: row.testScenario.story.sprintId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+// Shared by listApprovedApiCandidates and reclassifyStaleCandidates -- narrows to a Story whose
+// Sprint belongs to this org (and optionally a specific project/sprint/story-id set).
+function storyWhere(organizationId: string, filters?: AutomationCandidateFilters) {
+  return {
+    ...(filters?.storyIds?.length ? { id: { in: filters.storyIds } } : {}),
+    ...(filters?.sprintId ? { sprintId: filters.sprintId } : {}),
+    sprint: {
+      project: {
+        organizationId,
+        ...(filters?.projectId ? { id: filters.projectId } : {}),
+      },
+    },
   };
 }
 
@@ -87,15 +121,33 @@ export class PrismaTestCaseAutomationRepository implements ITestCaseAutomationRe
     return rows.map(toContext);
   }
 
+  async listApprovedApiCandidates(
+    organizationId: string,
+    filters?: AutomationCandidateFilters,
+  ): Promise<TestCaseAutomationContext[]> {
+    const rows = await this.prisma.testCase.findMany({
+      where: {
+        automationStatus: { in: ['AUTOMATABLE', 'AUTOMATED'] },
+        automationType: 'API',
+        testScenario: {
+          story: { ...storyWhere(organizationId, filters), baReviewState: { isLocked: true, status: 'APPROVED' } },
+        },
+      },
+      select: SELECT,
+      orderBy: { updatedAt: 'desc' },
+    });
+    return rows.map(toContext);
+  }
+
   async markAutomated(testCaseId: string): Promise<void> {
     await this.prisma.testCase.update({ where: { id: testCaseId }, data: { automationStatus: 'AUTOMATED' } });
   }
 
-  async reclassifyStaleCandidates(sprintId: string, organizationId: string): Promise<number> {
+  async reclassifyStaleCandidates(organizationId: string, filters?: AutomationCandidateFilters): Promise<number> {
     const staleScope = {
       automationStatus: 'MANUAL' as const,
       automationType: 'NONE' as const,
-      testScenario: { story: { sprintId, sprint: { project: { organizationId } } } },
+      testScenario: { story: storyWhere(organizationId, filters) },
     };
 
     const [apiReclassified, uiReclassified] = await Promise.all([

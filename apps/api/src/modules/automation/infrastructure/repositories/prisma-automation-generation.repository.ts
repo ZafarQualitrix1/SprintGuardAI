@@ -81,4 +81,12 @@ export class PrismaAutomationGenerationRepository implements IAutomationGenerati
     const row = await this.prisma.automationGeneration.update({ where: { id }, data: { status: 'SAVED' } });
     return toAutomationGenerationEntity(row);
   }
+
+  async markOutdatedForTestCaseIds(testCaseIds: string[]): Promise<void> {
+    if (testCaseIds.length === 0) return;
+    await this.prisma.automationGeneration.updateMany({
+      where: { testCaseId: { in: testCaseIds } },
+      data: { isOutdated: true },
+    });
+  }
 }

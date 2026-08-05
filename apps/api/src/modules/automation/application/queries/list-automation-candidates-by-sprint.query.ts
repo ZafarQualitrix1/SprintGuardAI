@@ -38,7 +38,7 @@ export class ListAutomationCandidatesBySprintHandler
     // classified (see test-generation.schema.ts) -- cheap (one updateMany per type, no AI calls),
     // safe to run on every fetch since it only ever touches cases still sitting at the MANUAL/NONE
     // defaults with an apiEndpoint/uiScreen already on record.
-    await this.testCaseRepository.reclassifyStaleCandidates(query.sprintId, query.organizationId);
+    await this.testCaseRepository.reclassifyStaleCandidates(query.organizationId, { sprintId: query.sprintId });
 
     const candidates = await this.testCaseRepository.listCandidatesBySprintId(query.sprintId, query.organizationId);
     if (candidates.length === 0) return [];

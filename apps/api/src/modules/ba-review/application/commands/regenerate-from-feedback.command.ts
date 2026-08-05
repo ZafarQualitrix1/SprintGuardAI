@@ -1,7 +1,8 @@
 import { Inject, Logger, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
 import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
+import { MarkAutomationOutdatedCommand } from '../../../automation/application/commands/mark-automation-outdated.command';
 import {
   TEST_CASE_REPOSITORY,
   ITestCaseRepository,
@@ -63,6 +64,7 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
     private readonly postReviewCommentService: PostReviewCommentService,
     private readonly auditLogService: AuditLogService,
     private readonly queryBus: QueryBus,
+    private readonly commandBus: CommandBus,
   ) {}
 
   async execute(command: RegenerateFromFeedbackCommand): Promise<BaReviewCycleEntity> {
@@ -152,6 +154,14 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
         })),
         removedIds: removed.map((r) => r.id),
       });
+
+      // Any automation already generated for a case the AI just rewrote no longer reflects that
+      // case's current content -- flag it rather than silently leaving stale generated code looking
+      // current. Added cases have no prior automation yet; removed cases' automation rows cascade-
+      // delete with the TestCase row itself, so only `modified` needs this.
+      if (modified.length > 0) {
+        await this.commandBus.execute(new MarkAutomationOutdatedCommand(modified.map((tc) => tc.id)));
+      }
 
       const scenarios = await this.testScenarioRepository.findByStoryId(command.storyId);
       const testCasesSnapshot: TestCaseSnapshotEntry[] = scenarios.map((scenario) => ({

@@ -41,12 +41,17 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
       throw new NotFoundException('Test case not found');
     }
 
+    // API Automation only ever lists BA-approved+locked stories as candidates in the first place --
+    // this check enforces that same rule at the command level too, so a direct call (bypassing the
+    // candidates listing UI) can't generate automation for a story that isn't approved yet. This is
+    // the inverse of what this check used to do (block generation once a story became locked, back
+    // when automation generation was an ungated per-sprint action available at any point).
     const isLocked = await this.queryBus.execute<IsStoryLockedQuery, boolean>(
       new IsStoryLockedQuery(command.organizationId, testCase.storyId),
     );
-    if (isLocked) {
+    if (!isLocked) {
       throw new ForbiddenException(
-        'This story is BA-approved and locked. An Admin must unlock it before generating automation.',
+        'Automation can only be generated for BA-approved, locked test cases. Submit this story for BA review and get it approved first.',
       );
     }
 

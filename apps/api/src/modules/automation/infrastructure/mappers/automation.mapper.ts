@@ -18,5 +18,6 @@ export function toAutomationGenerationEntity(row: AutomationGeneration): Automat
     (row.requiredPreconditions as unknown as string[] | null) ?? [],
     (row.missingRequirementDetails as unknown as string[] | null) ?? [],
     row.createdAt,
+    row.isOutdated,
   );
 }

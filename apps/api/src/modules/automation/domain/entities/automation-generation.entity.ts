@@ -23,5 +23,6 @@ export class AutomationGenerationEntity {
     public readonly requiredPreconditions: string[],
     public readonly missingRequirementDetails: string[],
     public readonly createdAt: Date,
+    public readonly isOutdated: boolean = false,
   ) {}
 }
