@@ -1031,6 +1031,15 @@ model AgentRun {
   tokensUsed      Int?
   costUsd         Decimal?       @db.Decimal(10, 6)
   error           String?
+  // Observability (attempts consumed beyond the first before this run reached its final status --
+  // 0 means it succeeded/failed on the first attempt). Nullable: rows created before this column
+  // existed have no recorded value, not a real "zero retries" fact.
+  retryCount      Int?
+  // Free-form, not a DB enum, so new classifications (e.g. Phase 3's auth/config/rate_limit/
+  // transient split) don't need a migration to add a value. Application-layer union type is
+  // ValidationStatus in agent-run.repository.interface.ts. One of: PASSED_FIRST_TRY,
+  // PASSED_AFTER_REPAIR, FAILED_VALIDATION, FAILED_PROVIDER_ERROR.
+  validationStatus String?
   startedAt       DateTime       @default(now())
   completedAt     DateTime?
 
@@ -1175,6 +1184,10 @@ model AiResponse {
   parsedResponse       Json
   confidenceScore      Float
   tokensUsed           Int?
+  // Split out of tokensUsed (which stays as the sum, for existing cost-estimation consumers) --
+  // the provider response already returns these separately; previously discarded before persistence.
+  inputTokens          Int?
+  outputTokens         Int?
   costUsd              Decimal? @db.Decimal(10, 6)
   latencyMs            Int?
   createdAt            DateTime @default(now())
