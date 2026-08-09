@@ -53,7 +53,15 @@ function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<str
     aiProviderConfigService,
   );
 
-  return { service, agentRunRepository, responseRepository, aiProviderConfigService, modelRegistryRepository };
+  return {
+    service,
+    agentRunRepository,
+    responseRepository,
+    aiProviderConfigService,
+    modelRegistryRepository,
+    promptRepository,
+    agentRepository,
+  };
 }
 
 describe('AiOrchestrationService', () => {
@@ -405,5 +413,80 @@ describe('AiOrchestrationService', () => {
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'SUCCEEDED', provider: 'anthropic', model: 'claude-sonnet-5' }),
     );
+  });
+
+  describe('reference-data caching', () => {
+    it('reuses cached prompt/agent/model-registry lookups across repeated execute() calls for the same capability', async () => {
+      const provider: jest.Mocked<IAiProvider> = {
+        key: 'groq',
+        complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+      };
+      const { service, promptRepository, agentRepository, modelRegistryRepository } = buildService(provider);
+      const callParams = {
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: { name: 'World' },
+        outputSchema,
+      };
+
+      await service.execute(callParams);
+      await service.execute(callParams);
+
+      expect(promptRepository.findActiveByCapability).toHaveBeenCalledTimes(1);
+      expect(agentRepository.findByKey).toHaveBeenCalledTimes(1);
+      expect(modelRegistryRepository.findActiveForCapability).toHaveBeenCalledTimes(1);
+      expect(provider.complete).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches the active prompt for a capability after invalidatePromptCapabilityCache() is called', async () => {
+      const provider: jest.Mocked<IAiProvider> = {
+        key: 'groq',
+        complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+      };
+      const { service, promptRepository } = buildService(provider);
+      const callParams = {
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: { name: 'World' },
+        outputSchema,
+      };
+
+      await service.execute(callParams);
+      service.invalidatePromptCapabilityCache('test-capability');
+      await service.execute(callParams);
+
+      expect(promptRepository.findActiveByCapability).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches a prompt by id after invalidatePromptByIdCache() is called', async () => {
+      const provider: jest.Mocked<IAiProvider> = {
+        key: 'groq',
+        complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+      };
+      const { service, promptRepository } = buildService(provider);
+      promptRepository.findById.mockResolvedValue({
+        id: 'prompt-draft-1',
+        capability: 'test-capability',
+        version: 'v2-draft',
+        template: 'Say hello to {{name}}',
+        templateHash: 'hash-2',
+      });
+      const callParams = {
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: { name: 'World' },
+        outputSchema,
+        promptOverride: 'prompt-draft-1',
+      };
+
+      await service.execute(callParams);
+      service.invalidatePromptByIdCache('prompt-draft-1');
+      await service.execute(callParams);
+
+      expect(promptRepository.findById).toHaveBeenCalledTimes(2);
+    });
   });
 });

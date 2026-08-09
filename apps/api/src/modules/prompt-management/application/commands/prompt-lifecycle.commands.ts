@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Inject, NotFoundException } fro
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { PROMPT_REPOSITORY, IPromptRepository } from '../../domain/repositories/prompt.repository.interface';
 import { PromptEntity } from '../../domain/entities/prompt.entity';
+import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
 
 // The full set of small DRAFT -> IN_REVIEW -> APPROVED -> ACTIVE -> DEPRECATED transitions, kept
 // in one file since each is a few lines and they're conceptually one state machine (mirrors the
@@ -79,7 +80,10 @@ export class ActivatePromptCommand {
 
 @CommandHandler(ActivatePromptCommand)
 export class ActivatePromptHandler implements ICommandHandler<ActivatePromptCommand, PromptEntity> {
-  constructor(@Inject(PROMPT_REPOSITORY) private readonly promptRepository: IPromptRepository) {}
+  constructor(
+    @Inject(PROMPT_REPOSITORY) private readonly promptRepository: IPromptRepository,
+    private readonly aiOrchestrationService: AiOrchestrationService,
+  ) {}
 
   async execute(command: ActivatePromptCommand): Promise<PromptEntity> {
     const prompt = await this.promptRepository.findById(command.promptId);
@@ -87,7 +91,12 @@ export class ActivatePromptHandler implements ICommandHandler<ActivatePromptComm
     if (prompt.status !== 'APPROVED') {
       throw new BadRequestException('Only an APPROVED version can be activated -- submit for review and get it approved first.');
     }
-    return this.promptRepository.activate(command.promptId, prompt.capability);
+    const activated = await this.promptRepository.activate(command.promptId, prompt.capability);
+    // AiOrchestrationService.execute() caches the active prompt per capability for
+    // REFERENCE_DATA_CACHE_TTL_MS -- without this, the next execute() call for this capability could
+    // keep using the version that was just superseded for up to that long.
+    this.aiOrchestrationService.invalidatePromptCapabilityCache(prompt.capability);
+    return activated;
   }
 }
 
@@ -115,7 +124,10 @@ export class DeletePromptCommand {
 
 @CommandHandler(DeletePromptCommand)
 export class DeletePromptHandler implements ICommandHandler<DeletePromptCommand, void> {
-  constructor(@Inject(PROMPT_REPOSITORY) private readonly promptRepository: IPromptRepository) {}
+  constructor(
+    @Inject(PROMPT_REPOSITORY) private readonly promptRepository: IPromptRepository,
+    private readonly aiOrchestrationService: AiOrchestrationService,
+  ) {}
 
   async execute(command: DeletePromptCommand): Promise<void> {
     const prompt = await this.promptRepository.findById(command.promptId);
@@ -128,5 +140,8 @@ export class DeletePromptHandler implements ICommandHandler<DeletePromptCommand,
       throw new ConflictException('This version has execution history and cannot be deleted -- archive it instead.');
     }
     await this.promptRepository.delete(command.promptId);
+    // A cached findById(promptId) result (e.g. from a Prompt Playground test run against this exact
+    // draft) must not keep being served for a row that no longer exists.
+    this.aiOrchestrationService.invalidatePromptByIdCache(command.promptId);
   }
 }

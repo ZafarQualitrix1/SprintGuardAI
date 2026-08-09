@@ -12,19 +12,23 @@ import { AI_PROVIDERS, AiCompletionResult, IAiProvider } from '../ports/ai-provi
 import {
   AGENT_REPOSITORY,
   IAgentRepository,
+  AgentCatalogEntry,
   AGENT_RUN_REPOSITORY,
   IAgentRunRepository,
   AI_PROMPT_REPOSITORY,
   IAiPromptRepository,
+  ActivePrompt,
   AI_RESPONSE_REPOSITORY,
   IAiResponseRepository,
   MODEL_REGISTRY_REPOSITORY,
   IModelRegistryRepository,
+  ModelRegistryEntry,
 } from '../../domain/repositories';
 import { renderTemplate } from '../utils/prompt-template.util';
 import { extractJson } from '../utils/json-extractor.util';
 import { computeConfidence } from '../utils/confidence.util';
 import { estimateCostUsd } from '../utils/model-pricing.util';
+import { InProcessTtlCache } from '../utils/in-process-ttl-cache';
 import { AiProviderConfigService, ResolvedAiConfig } from './ai-provider-config.service';
 
 const SYSTEM_PROMPT =
@@ -151,6 +155,13 @@ function extractStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+// Prompt/agent/model-registry rows are re-read on every single execute() call but change rarely --
+// an admin editing AI Settings or activating a new prompt version, not every request. A short TTL
+// (rather than an unbounded cache) bounds how long a stale read can persist without any invalidation
+// wiring at all; the capability/id-keyed caches below are invalidated eagerly on the specific
+// mutations that can make them stale (see invalidatePromptCapabilityCache/invalidatePromptByIdCache).
+const REFERENCE_DATA_CACHE_TTL_MS = 60_000;
+
 function classifyAttemptFailure(error: unknown): { kind: AttemptFailureKind; message: string } {
   const message = error instanceof Error ? error.message : String(error);
 
@@ -179,6 +190,13 @@ function classifyAttemptFailure(error: unknown): { kind: AttemptFailureKind; mes
 // immediately with no code change or redeploy.
 @Injectable()
 export class AiOrchestrationService {
+  // One cache instance per @Injectable() singleton -- correct as-is since Nest gives this service
+  // exactly one instance per running application (per warm serverless invocation context here).
+  private readonly promptByCapabilityCache = new InProcessTtlCache<ActivePrompt | null>(REFERENCE_DATA_CACHE_TTL_MS);
+  private readonly promptByIdCache = new InProcessTtlCache<ActivePrompt | null>(REFERENCE_DATA_CACHE_TTL_MS);
+  private readonly agentByKeyCache = new InProcessTtlCache<AgentCatalogEntry | null>(REFERENCE_DATA_CACHE_TTL_MS);
+  private readonly modelRegistryCache = new InProcessTtlCache<ModelRegistryEntry | null>(REFERENCE_DATA_CACHE_TTL_MS);
+
   constructor(
     @Inject(AI_PROVIDERS) private readonly providers: IAiProvider[],
     @Inject(AGENT_REPOSITORY) private readonly agentRepository: IAgentRepository,
@@ -188,6 +206,20 @@ export class AiOrchestrationService {
     @Inject(MODEL_REGISTRY_REPOSITORY) private readonly modelRegistryRepository: IModelRegistryRepository,
     private readonly aiProviderConfigService: AiProviderConfigService,
   ) {}
+
+  // Called by Prompt Management's ActivatePromptHandler after activate() succeeds -- the newly
+  // activated version must be visible to the very next execute() call for this capability, not up
+  // to REFERENCE_DATA_CACHE_TTL_MS later.
+  invalidatePromptCapabilityCache(capability: string): void {
+    this.promptByCapabilityCache.delete(capability);
+  }
+
+  // Called by Prompt Management's UpdatePromptDraftHandler/DeletePromptHandler -- both change what
+  // findById(promptId) would return (a DRAFT's template, or the row's existence) for an id the
+  // Prompt Playground may have already cached via promptOverride.
+  invalidatePromptByIdCache(promptId: string): void {
+    this.promptByIdCache.delete(promptId);
+  }
 
   async execute<T>(params: ExecuteAgentParams<T>): Promise<ExecuteAgentResult<T>> {
     const correlationId = params.correlationId ?? randomUUID();
@@ -221,9 +253,9 @@ export class AiOrchestrationService {
 
     const [prompt, agent] = await Promise.all([
       params.promptOverride
-        ? this.promptRepository.findById(params.promptOverride)
-        : this.promptRepository.findActiveByCapability(params.capability),
-      this.agentRepository.findByKey(params.agentKey),
+        ? this.getCachedPromptById(params.promptOverride)
+        : this.getCachedActivePromptByCapability(params.capability),
+      this.getCachedAgentByKey(params.agentKey),
     ]);
 
     if (!prompt) {
@@ -340,14 +372,45 @@ export class AiOrchestrationService {
     return providerImpl;
   }
 
+  private async getCachedActivePromptByCapability(capability: string): Promise<ActivePrompt | null> {
+    const cached = this.promptByCapabilityCache.get(capability);
+    if (cached !== undefined) return cached;
+    const prompt = await this.promptRepository.findActiveByCapability(capability);
+    this.promptByCapabilityCache.set(capability, prompt);
+    return prompt;
+  }
+
+  private async getCachedPromptById(id: string): Promise<ActivePrompt | null> {
+    const cached = this.promptByIdCache.get(id);
+    if (cached !== undefined) return cached;
+    const prompt = await this.promptRepository.findById(id);
+    this.promptByIdCache.set(id, prompt);
+    return prompt;
+  }
+
+  private async getCachedAgentByKey(key: string): Promise<AgentCatalogEntry | null> {
+    const cached = this.agentByKeyCache.get(key);
+    if (cached !== undefined) return cached;
+    const agent = await this.agentRepository.findByKey(key);
+    this.agentByKeyCache.set(key, agent);
+    return agent;
+  }
+
   // Single lookup reused for both the model string and the registry entry id -- these used to be
   // two separate methods (resolveRegistryModel/registryEntryId) called back-to-back with identical
-  // arguments, issuing the same findActiveForCapability query twice per execute() call.
+  // arguments, issuing the same findActiveForCapability query twice per execute() call. No cache
+  // invalidation wiring exists for this one -- ModelRegistryEntry rows are seed/admin data with no
+  // mutation command anywhere in the app, so nothing running can make a cached entry stale.
   private async resolveModelRegistryEntry(
     provider: string,
     capability: string,
   ): Promise<{ id: string; model: string }> {
-    const modelEntry = await this.modelRegistryRepository.findActiveForCapability(provider, capability);
+    const cacheKey = `${provider}:${capability}`;
+    const cached = this.modelRegistryCache.get(cacheKey);
+    const modelEntry = cached !== undefined ? cached : await this.modelRegistryRepository.findActiveForCapability(provider, capability);
+    if (cached === undefined) {
+      this.modelRegistryCache.set(cacheKey, modelEntry);
+    }
     if (!modelEntry) {
       throw new NotFoundException(`No active model registered for provider "${provider}" and capability "${capability}"`);
     }
