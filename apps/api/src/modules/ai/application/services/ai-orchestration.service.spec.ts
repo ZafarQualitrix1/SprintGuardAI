@@ -169,6 +169,72 @@ describe('AiOrchestrationService', () => {
     expect(provider.complete.mock.calls[0][0].maxTokens).toBe(8000);
   });
 
+  it('raises a too-short configured timeout up to the floor for large-output capabilities', async () => {
+    jest.useFakeTimers();
+    try {
+      // A response that arrives well after the org-configured 5000ms, but well within the
+      // large-output floor (90000ms) -- without the floor, withTimeout would reject at 5000ms and
+      // this response would never be observed.
+      const provider: jest.Mocked<IAiProvider> = {
+        key: 'groq',
+        complete: jest
+          .fn()
+          .mockImplementation(
+            () =>
+              new Promise((resolve) =>
+                setTimeout(() => resolve({ text: '{"items":["a"]}', inputTokens: 1, outputTokens: 1 }), 50000),
+              ),
+          ),
+      };
+      const { service } = buildService(provider, { timeoutMs: 5000 });
+
+      const resultPromise = service.execute({
+        capability: 'deep-requirement-analysis',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: {},
+        outputSchema,
+      });
+
+      await jest.advanceTimersByTimeAsync(50000);
+      await expect(resultPromise).resolves.toEqual(expect.objectContaining({ data: { items: ['a'] } }));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('still enforces a short configured timeout as-is for ordinary (non-large-output) capabilities', async () => {
+    jest.useFakeTimers();
+    try {
+      const provider: jest.Mocked<IAiProvider> = {
+        key: 'groq',
+        complete: jest
+          .fn()
+          .mockImplementation(
+            () =>
+              new Promise((resolve) =>
+                setTimeout(() => resolve({ text: '{"items":["a"]}', inputTokens: 1, outputTokens: 1 }), 50000),
+              ),
+          ),
+      };
+      const { service } = buildService(provider, { timeoutMs: 5000, retryCount: 1 });
+
+      const resultPromise = service.execute({
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: {},
+        outputSchema,
+      });
+      resultPromise.catch(() => {}); // avoid an unhandled-rejection warning before the assertion below
+
+      await jest.advanceTimersByTimeAsync(5000);
+      await expect(resultPromise).rejects.toThrow(/failed validation after retry/);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('retries once against the configured fallback provider when the primary exhausts its retries', async () => {
     const primaryProvider: jest.Mocked<IAiProvider> = {
       key: 'groq',

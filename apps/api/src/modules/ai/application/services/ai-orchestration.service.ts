@@ -53,6 +53,24 @@ function clampMaxTokens(capability: string, configuredMaxTokens: number | undefi
   return Math.min(configuredMaxTokens, ceiling);
 }
 
+// Same LARGE_OUTPUT_CAPABILITIES set as above, applied as a *floor* rather than a ceiling: these are
+// the same capabilities allowed to generate up to LARGE_OUTPUT_MAX_TOKENS_CEILING tokens of
+// structured output, so a short org-configured timeout (e.g. this account's Groq AiProviderConfig,
+// which is 30000ms -- set with lighter capabilities in mind) can cut off a call that was always going
+// to take longer, not one that's actually stuck. DEFAULT_TIMEOUT_MS closes a separate gap: when
+// neither ModuleAiConfig nor AiProviderConfig has timeoutMs set at all, withTimeout() previously
+// applied no timeout whatsoever, silently inheriting the underlying SDK's own 600000ms (10 minute)
+// default -- this ensures every call is bounded by something sane even on a totally unconfigured
+// provider/capability combination.
+const LARGE_OUTPUT_TIMEOUT_FLOOR_MS = 90000;
+const DEFAULT_TIMEOUT_MS = 60000;
+
+function clampTimeout(capability: string, configuredTimeoutMs: number | undefined): number {
+  if (configuredTimeoutMs === undefined) return DEFAULT_TIMEOUT_MS;
+  const floor = LARGE_OUTPUT_CAPABILITIES.has(capability) ? LARGE_OUTPUT_TIMEOUT_FLOOR_MS : 0;
+  return Math.max(configuredTimeoutMs, floor);
+}
+
 export interface ExecuteAgentParams<T> {
   capability: string;
   agentKey: string;
@@ -131,6 +149,7 @@ export class AiOrchestrationService {
     const effective: ResolvedAiConfig = {
       ...resolved,
       maxTokens: clampMaxTokens(params.capability, resolved.maxTokens),
+      timeoutMs: clampTimeout(params.capability, resolved.timeoutMs),
     };
 
     const [prompt, agent] = await Promise.all([
@@ -152,8 +171,16 @@ export class AiOrchestrationService {
     }
 
     const explicitModel = effective.model;
-    const model = explicitModel ?? (await this.resolveRegistryModel(provider, params.capability));
-    const modelRegistryEntryId = explicitModel ? undefined : await this.registryEntryId(provider, params.capability);
+    let model: string;
+    let modelRegistryEntryId: string | undefined;
+    if (explicitModel) {
+      model = explicitModel;
+      modelRegistryEntryId = undefined;
+    } else {
+      const registryEntry = await this.resolveModelRegistryEntry(provider, params.capability);
+      model = registryEntry.model;
+      modelRegistryEntryId = registryEntry.id;
+    }
 
     const providerImpl = this.findProvider(provider);
 
@@ -246,17 +273,18 @@ export class AiOrchestrationService {
     return providerImpl;
   }
 
-  private async resolveRegistryModel(provider: string, capability: string): Promise<string> {
+  // Single lookup reused for both the model string and the registry entry id -- these used to be
+  // two separate methods (resolveRegistryModel/registryEntryId) called back-to-back with identical
+  // arguments, issuing the same findActiveForCapability query twice per execute() call.
+  private async resolveModelRegistryEntry(
+    provider: string,
+    capability: string,
+  ): Promise<{ id: string; model: string }> {
     const modelEntry = await this.modelRegistryRepository.findActiveForCapability(provider, capability);
     if (!modelEntry) {
       throw new NotFoundException(`No active model registered for provider "${provider}" and capability "${capability}"`);
     }
-    return modelEntry.model;
-  }
-
-  private async registryEntryId(provider: string, capability: string): Promise<string | undefined> {
-    const modelEntry = await this.modelRegistryRepository.findActiveForCapability(provider, capability);
-    return modelEntry?.id;
+    return { id: modelEntry.id, model: modelEntry.model };
   }
 
   private async runAttempts<T>(args: {

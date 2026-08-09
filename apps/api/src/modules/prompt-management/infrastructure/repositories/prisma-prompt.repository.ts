@@ -85,11 +85,22 @@ export class PrismaPromptRepository implements IPromptRepository {
     let rows: PromptLibraryRow[] = [...latestByCapability.values()].map((p) => {
       const agent = capabilityToAgent.get(p.capability) ?? null;
       const moduleConfig = moduleConfigByCapability.get(p.capability);
-      const provider = (moduleConfig?.isEnabled ? moduleConfig.provider : undefined) ?? defaultProviderConfig?.provider ?? 'anthropic';
-      const model =
-        (moduleConfig?.isEnabled ? moduleConfig.model : undefined) ??
-        modelEntries.find((m) => m.provider === provider && (m.allowedCapabilities as string[]).includes(p.capability))?.model ??
-        null;
+      const moduleProvider = moduleConfig?.isEnabled ? (moduleConfig.provider ?? undefined) : undefined;
+      const moduleModel = moduleConfig?.isEnabled ? (moduleConfig.model ?? undefined) : undefined;
+      // Real execution resolves provider+model per capability via ModelRegistryEntry.
+      // allowedCapabilities (AiOrchestrationService.resolveModelRegistryEntry), independent of any
+      // org-wide "default provider" guess -- several capabilities (deep-requirement-analysis,
+      // test-case-improvement, ba-review-submission-summary) are pinned to a specific provider
+      // directly in code and are only registered under that one provider here, so guessing the
+      // default provider first and only then looking for a matching entry (the previous behavior)
+      // could miss a real, active registry entry entirely and show a blank Model cell despite
+      // execution working correctly. Search across every active provider for a capability match
+      // instead, honoring an explicit moduleProvider if the org configured one.
+      const matchingRegistryEntry = modelEntries.find(
+        (m) => (m.allowedCapabilities as string[]).includes(p.capability) && (!moduleProvider || m.provider === moduleProvider),
+      );
+      const provider = moduleProvider ?? matchingRegistryEntry?.provider ?? defaultProviderConfig?.provider ?? 'anthropic';
+      const model = moduleModel ?? matchingRegistryEntry?.model ?? null;
       const stats = statsByPromptId.get(p.id);
       const agentRow = agent ? agents.find((a) => a.key === agent.key) : undefined;
       const runStats = agentRow ? runStatsByAgentId.get(agentRow.id) : undefined;
