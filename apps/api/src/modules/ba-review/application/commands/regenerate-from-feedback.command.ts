@@ -100,6 +100,10 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
         },
         outputSchema: testCaseImprovementOutputSchema,
         provider: 'groq',
+        // Stable per-story key: rejects a second concurrent feedback-driven regeneration for the
+        // same story (e.g. a duplicated BA-reply webhook/poll) instead of racing this call's
+        // applyChangeset() write and the state machine's REGENERATION_IN_PROGRESS transition above.
+        correlationId: `test-case-improvement:${command.storyId}`,
       });
 
       const { added, modified, removed, improvementSummary } = result.data;

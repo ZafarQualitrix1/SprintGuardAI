@@ -28,4 +28,13 @@ export interface CompleteAgentRunInput {
 export interface IAgentRunRepository {
   start(input: StartAgentRunInput): Promise<{ id: string }>;
   complete(input: CompleteAgentRunInput): Promise<void>;
+  /**
+   * Request deduplication: finds a still-in-flight run (PENDING/RUNNING) for the same org +
+   * correlationId, if any. Callers that want deduplication pass a stable correlationId (e.g.
+   * `deep-requirement-analysis:${storyId}`) instead of leaving it to default to a fresh random one.
+   * Best-effort, not a hard lock -- a check-then-insert race is possible under truly simultaneous
+   * requests (no unique constraint backs this), but closes the everyday case this guards against
+   * (a slow request still running when the same user clicks the same button again).
+   */
+  findActiveByCorrelationId(organizationId: string, correlationId: string): Promise<{ id: string; startedAt: Date } | null>;
 }

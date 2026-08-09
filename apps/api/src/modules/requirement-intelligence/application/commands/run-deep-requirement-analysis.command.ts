@@ -83,6 +83,10 @@ export class RunDeepRequirementAnalysisHandler
       variables: { storyContext },
       outputSchema: deepRequirementAnalysisOutputSchema,
       provider: 'groq',
+      // Stable per-story key: a second "Analyze" click (or a retried request) while this story's
+      // analysis is still running gets rejected with a clear 409 instead of racing this call and
+      // doubling load on top of the fire-and-forget requirement-intelligence call already in flight.
+      correlationId: `deep-requirement-analysis:${command.storyId}`,
     });
 
     return this.reportRepository.createNewVersion({

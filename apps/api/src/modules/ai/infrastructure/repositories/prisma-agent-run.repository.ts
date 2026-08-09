@@ -41,4 +41,13 @@ export class PrismaAgentRunRepository implements IAgentRunRepository {
       },
     });
   }
+
+  async findActiveByCorrelationId(organizationId: string, correlationId: string) {
+    const row = await this.prisma.agentRun.findFirst({
+      where: { organizationId, correlationId, status: { in: ['PENDING', 'RUNNING'] } },
+      select: { id: true, startedAt: true },
+      orderBy: { startedAt: 'desc' },
+    });
+    return row;
+  }
 }

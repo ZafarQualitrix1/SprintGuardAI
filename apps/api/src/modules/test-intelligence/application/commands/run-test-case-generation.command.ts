@@ -74,6 +74,10 @@ export class RunTestCaseGenerationHandler implements ICommandHandler<RunTestCase
           scenarioDescription: scenario.description ?? 'No additional description.',
         },
         outputSchema: testCaseOutputSchema,
+        // Stable per-scenario key: rejects a second concurrent generation for the same scenario
+        // (e.g. an overlapping "Generate Test Cases" click) instead of racing this call's
+        // replaceForScenario() write.
+        correlationId: `test-case:${scenario.id}`,
       });
 
       await this.testCaseRepository.replaceForScenario(scenario.id, command.storyId, caseResult.data.cases);

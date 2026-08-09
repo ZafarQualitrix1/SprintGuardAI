@@ -59,6 +59,11 @@ export class RunRequirementIntelligenceAgentHandler
       provider: 'groq',
       variables: { storyTitle: story.title, storyDescription: story.description ?? 'No description provided.' },
       outputSchema: requirementIntelligenceOutputSchema,
+      // Stable per-story key: this command is fired both directly and fire-and-forget from
+      // run-deep-requirement-analysis -- a second concurrent call for the same story (double-click,
+      // or an overlapping deep-analysis trigger) gets rejected with a clear 409 instead of racing the
+      // first call's replaceForStory() write.
+      correlationId: `requirement-intelligence:${command.storyId}`,
     });
 
     const requirements = result.data.requirements.map((requirement) => ({

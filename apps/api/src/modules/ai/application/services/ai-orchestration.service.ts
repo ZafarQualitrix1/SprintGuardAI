@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ZodType } from 'zod';
 import { AI_PROVIDERS, IAiProvider } from '../ports/ai-provider.port';
 import {
@@ -79,6 +79,11 @@ export interface ExecuteAgentParams<T> {
   // Input/Def left as `any` (not tied to T) so schemas using .default() -- whose parsed Input and
   // Output types legitimately differ -- can be passed without a spurious structural mismatch.
   outputSchema: ZodType<T, any, any>;
+  // Left unset, a random id is generated and no dedup check runs (today's default behavior for most
+  // callers). Callers that want double-click/concurrent-retry protection pass a key that's STABLE
+  // across repeat calls for "the same operation" (e.g. `deep-requirement-analysis:${storyId}`) --
+  // execute() then rejects a new call outright while an earlier call with that same key is still
+  // PENDING/RUNNING, instead of racing it. See IAgentRunRepository.findActiveByCorrelationId.
   correlationId?: string;
   provider?: string;
   // Prompt Management Playground: test a specific prompt version (any status, not just the
@@ -137,6 +142,19 @@ export class AiOrchestrationService {
 
   async execute<T>(params: ExecuteAgentParams<T>): Promise<ExecuteAgentResult<T>> {
     const correlationId = params.correlationId ?? randomUUID();
+
+    // Request deduplication guard -- only runs when the caller opted in with a stable correlationId.
+    // A freshly randomUUID()'d correlationId can never collide with a prior run, so skipping the
+    // query in that case is both correct and avoids an extra DB round trip for every call that
+    // hasn't been wired for dedup yet.
+    if (params.correlationId) {
+      const active = await this.agentRunRepository.findActiveByCorrelationId(params.organizationId, params.correlationId);
+      if (active) {
+        throw new ConflictException(
+          `This operation is already in progress (started ${active.startedAt.toISOString()}). Please wait for it to finish before retrying.`,
+        );
+      }
+    }
 
     const resolved = await this.aiProviderConfigService.resolveEffectiveConfig(
       params.organizationId,

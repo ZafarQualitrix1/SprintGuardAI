@@ -14,6 +14,7 @@ function buildService(provider: IAiProvider, resolvedConfigOverrides: Record<str
   const agentRunRepository: jest.Mocked<IAgentRunRepository> = {
     start: jest.fn().mockResolvedValue({ id: 'run-1' }),
     complete: jest.fn().mockResolvedValue(undefined),
+    findActiveByCorrelationId: jest.fn().mockResolvedValue(null),
   };
   const responseRepository: jest.Mocked<IAiResponseRepository> = {
     create: jest.fn().mockResolvedValue({ id: 'response-1' }),
@@ -235,6 +236,49 @@ describe('AiOrchestrationService', () => {
     }
   });
 
+  it('rejects a call with a correlationId that matches an already in-flight run, without starting a new one', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+    };
+    const { service, agentRunRepository } = buildService(provider);
+    agentRunRepository.findActiveByCorrelationId.mockResolvedValue({ id: 'run-already-running', startedAt: new Date() });
+
+    await expect(
+      service.execute({
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: { name: 'World' },
+        outputSchema,
+        correlationId: 'deep-requirement-analysis:story-1',
+      }),
+    ).rejects.toThrow(/already in progress/);
+
+    expect(agentRunRepository.findActiveByCorrelationId).toHaveBeenCalledWith('org-1', 'deep-requirement-analysis:story-1');
+    expect(agentRunRepository.start).not.toHaveBeenCalled();
+    expect(provider.complete).not.toHaveBeenCalled();
+  });
+
+  it('does not check for an in-flight run when no correlationId is supplied', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockResolvedValue({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+    };
+    const { service, agentRunRepository } = buildService(provider);
+
+    await service.execute({
+      capability: 'test-capability',
+      agentKey: 'test-agent',
+      organizationId: 'org-1',
+      variables: { name: 'World' },
+      outputSchema,
+    });
+
+    expect(agentRunRepository.findActiveByCorrelationId).not.toHaveBeenCalled();
+    expect(agentRunRepository.start).toHaveBeenCalledTimes(1);
+  });
+
   it('retries once against the configured fallback provider when the primary exhausts its retries', async () => {
     const primaryProvider: jest.Mocked<IAiProvider> = {
       key: 'groq',
@@ -248,6 +292,7 @@ describe('AiOrchestrationService', () => {
     const agentRunRepository: jest.Mocked<IAgentRunRepository> = {
       start: jest.fn().mockResolvedValue({ id: 'run-1' }),
       complete: jest.fn().mockResolvedValue(undefined),
+      findActiveByCorrelationId: jest.fn().mockResolvedValue(null),
     };
     const responseRepository: jest.Mocked<IAiResponseRepository> = {
       create: jest.fn().mockResolvedValue({ id: 'response-1' }),

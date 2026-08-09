@@ -93,6 +93,10 @@ export class RunTestScenarioGenerationHandler
         provider: 'groq',
         variables: { storyTitle: ac.storyTitle, given: ac.given, when: ac.when, then: ac.then },
         outputSchema: testScenarioOutputSchema,
+        // Stable per-acceptance-criterion key: rejects a second concurrent generation for the same
+        // AC (e.g. an overlapping "Generate Test Scenarios" click) instead of racing this call's
+        // replaceForAcceptanceCriterion() write.
+        correlationId: `test-scenario:${ac.id}`,
       });
 
       await this.testScenarioRepository.replaceForAcceptanceCriterion(ac.id, ac.storyId, scenarioResult.data.scenarios);
