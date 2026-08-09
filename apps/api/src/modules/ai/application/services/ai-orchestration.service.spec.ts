@@ -130,6 +130,59 @@ describe('AiOrchestrationService', () => {
     );
   });
 
+  it('retries a transient provider-level failure with the original prompt unchanged, after a short backoff', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('socket hang up'))
+        .mockResolvedValueOnce({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
+    };
+    const { service } = buildService(provider);
+
+    const result = await service.execute({
+      capability: 'test-capability',
+      agentKey: 'test-agent',
+      organizationId: 'org-1',
+      variables: { name: 'World' },
+      outputSchema,
+    });
+
+    expect(result.data).toEqual({ items: ['a'] });
+    expect(provider.complete).toHaveBeenCalledTimes(2);
+    // Unlike a validation-repair retry, the prompt is resent unchanged -- the model never got a
+    // chance to respond, so there's nothing to "correct".
+    expect(provider.complete.mock.calls[1][0].prompt).toBe(provider.complete.mock.calls[0][0].prompt);
+    expect(provider.complete.mock.calls[1][0].prompt).not.toContain('Your previous response was invalid');
+  });
+
+  it('fails fast on an authentication error without exhausting the remaining retry attempts', async () => {
+    const authError = Object.assign(new Error('Invalid API key'), { status: 401 });
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockRejectedValue(authError),
+    };
+    const { service, agentRunRepository } = buildService(provider);
+
+    await expect(
+      service.execute({
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: {},
+        outputSchema,
+      }),
+    ).rejects.toThrow(/failed validation after retry/);
+
+    // DEFAULT_MAX_ATTEMPTS is 2, but an auth failure can never succeed by retrying with the same
+    // credentials -- confirms the loop stopped after the first attempt instead of burning a second
+    // one on the same doomed call.
+    expect(provider.complete).toHaveBeenCalledTimes(1);
+    expect(agentRunRepository.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW', error: 'Invalid API key' }),
+    );
+  });
+
   it('clamps an oversized configured maxTokens down to the capability ceiling before calling the provider', async () => {
     const provider: jest.Mocked<IAiProvider> = {
       key: 'groq',

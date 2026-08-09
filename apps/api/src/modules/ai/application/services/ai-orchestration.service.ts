@@ -1,7 +1,14 @@
 import { randomUUID } from 'crypto';
-import { ConflictException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { ZodType } from 'zod';
-import { AI_PROVIDERS, IAiProvider } from '../ports/ai-provider.port';
+import { AI_PROVIDERS, AiCompletionResult, IAiProvider } from '../ports/ai-provider.port';
 import {
   AGENT_REPOSITORY,
   IAgentRepository,
@@ -117,6 +124,48 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number | undefined): Pro
       setTimeout(() => reject(new Error(`AI provider call timed out after ${timeoutMs}ms`)), timeoutMs),
     ),
   ]);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Short pause before retrying a *provider-level* failure (timeout/network/5xx/429) -- politer to a
+// possibly-still-struggling or rate-limited provider than an immediate hammer, without meaningfully
+// slowing down the common case (this never delays a validation-repair retry, see runAttempts below).
+const TRANSIENT_RETRY_BACKOFF_MS = 500;
+
+type AttemptFailureKind = 'auth' | 'config' | 'rate_limit' | 'transient';
+
+// Every provider adapter here (groq/openai/gemini/openrouter via the `openai` SDK, anthropic via
+// `@anthropic-ai/sdk`) throws an error with a numeric `.status` set to the HTTP response code on
+// API failures -- and so does Nest's own HttpException (e.g. InternalServerErrorException, which
+// getClient() throws synchronously for a missing API key before any HTTP call happens). That
+// second case is the one `.status` alone can't disambiguate from a genuine provider 5xx (both read
+// as 500), so it's checked by class first.
+function extractStatus(error: unknown): number | undefined {
+  if (error && typeof error === 'object' && 'status' in error) {
+    const status = (error as { status: unknown }).status;
+    if (typeof status === 'number') return status;
+  }
+  return undefined;
+}
+
+function classifyAttemptFailure(error: unknown): { kind: AttemptFailureKind; message: string } {
+  const message = error instanceof Error ? error.message : String(error);
+
+  // Thrown by us (missing/misconfigured API key), never by a provider SDK -- retrying with the same
+  // credentials can't succeed, same as an auth failure.
+  if (error instanceof InternalServerErrorException) {
+    return { kind: 'config', message };
+  }
+
+  const status = extractStatus(error);
+  if (status === 401 || status === 403) return { kind: 'auth', message };
+  if (status === 429) return { kind: 'rate_limit', message };
+  // Anything else that reached here -- a genuine 5xx, withTimeout's own timeout Error, a raw network
+  // error with no status at all -- is presumed transient and worth a backed-off retry.
+  return { kind: 'transient', message };
 }
 
 // Application-layer service (Solution Architecture §16.1) -- the only thing any agent-executing
@@ -315,17 +364,28 @@ export class AiOrchestrationService {
   }): Promise<{ outcome: AttemptOutcome<T> | null; lastError: string }> {
     const { providerImpl, model, config, renderedPrompt, outputSchema, maxAttempts } = args;
     let lastError = '';
+    // Only a schema/JSON-extraction failure means the model actually responded, just not with valid
+    // output -- that's the one case a "your previous response was invalid, return corrected JSON"
+    // repair prompt is honest and useful. A provider-level failure (timeout/network/5xx/429) means
+    // the model never got a chance to respond at all, so retrying re-sends the ORIGINAL prompt
+    // unchanged; telling it its (nonexistent) JSON was wrong would just be misleading.
+    let lastFailureWasValidation = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0 && !lastFailureWasValidation) {
+        await delay(TRANSIENT_RETRY_BACKOFF_MS);
+      }
+
       const userPrompt =
-        attempt === 0
-          ? renderedPrompt
-          : `${renderedPrompt}\n\nYour previous response was invalid: ${lastError}\nReturn ONLY corrected, valid JSON.`;
+        attempt > 0 && lastFailureWasValidation
+          ? `${renderedPrompt}\n\nYour previous response was invalid: ${lastError}\nReturn ONLY corrected, valid JSON.`
+          : renderedPrompt;
 
       const startedAt = Date.now();
+      let completion: AiCompletionResult;
 
       try {
-        const completion = await withTimeout(
+        completion = await withTimeout(
           providerImpl.complete(
             {
               systemPrompt: SYSTEM_PROMPT,
@@ -340,9 +400,25 @@ export class AiOrchestrationService {
           ),
           config.timeoutMs,
         );
-        const rawText = completion.text;
-        const tokensUsed = completion.inputTokens + completion.outputTokens;
+      } catch (error) {
+        const classified = classifyAttemptFailure(error);
+        lastError = classified.message;
+        lastFailureWasValidation = false;
 
+        // Retrying with the same bad credentials (or a provider that just told us we're not
+        // authorized) can't succeed -- stop now instead of burning the remaining attempts (and, for
+        // a real auth failure, more of the org's rate-limit budget) on a call guaranteed to fail the
+        // same way every time.
+        if (classified.kind === 'auth' || classified.kind === 'config') {
+          break;
+        }
+        continue;
+      }
+
+      const rawText = completion.text;
+      const tokensUsed = completion.inputTokens + completion.outputTokens;
+
+      try {
         const json = extractJson(rawText);
         const parsed = outputSchema.safeParse(json);
 
@@ -363,6 +439,7 @@ export class AiOrchestrationService {
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
       }
+      lastFailureWasValidation = true;
     }
 
     return { outcome: null, lastError };
