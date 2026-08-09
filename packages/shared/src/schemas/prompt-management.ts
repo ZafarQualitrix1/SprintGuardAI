@@ -97,9 +97,14 @@ export interface PromptAnalyticsSummary {
   successRate: number;
   failureRate: number;
   avgLatencyMs: number;
+  p50LatencyMs: number;
+  p95LatencyMs: number;
   avgTokens: number;
   avgCostUsd: number;
   avgConfidenceScore: number;
+  retriedExecutionsCount: number;
+  validationFailureCount: number;
+  providerErrorCount: number;
   byCapability: { capability: string; executions: number; successRate: number; avgLatencyMs: number }[];
   byProvider: { provider: string; executions: number; successRate: number; avgCostUsd: number }[];
   topPerforming: { capability: string; version: string; successRate: number; executions: number }[];

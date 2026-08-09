@@ -60,10 +60,15 @@ export function PromptAnalytics() {
         <StatTile label="Success Rate" value={`${Math.round(data.successRate * 100)}%`} />
         <StatTile label="Failure Rate" value={`${Math.round(data.failureRate * 100)}%`} />
         <StatTile label="Avg Response Time" value={`${Math.round(data.avgLatencyMs)}ms`} />
+        <StatTile label="P50 Response Time" value={`${Math.round(data.p50LatencyMs)}ms`} />
+        <StatTile label="P95 Response Time" value={`${Math.round(data.p95LatencyMs)}ms`} />
         <StatTile label="Avg Tokens" value={String(Math.round(data.avgTokens))} />
         <StatTile label="Avg Cost" value={`$${data.avgCostUsd.toFixed(4)}`} />
         <StatTile label="Avg Confidence" value={`${Math.round(data.avgConfidenceScore * 100)}%`} />
         <StatTile label="Capabilities Tracked" value={String(data.byCapability.length)} />
+        <StatTile label="Executions Retried" value={String(data.retriedExecutionsCount)} />
+        <StatTile label="Validation Failures" value={String(data.validationFailureCount)} />
+        <StatTile label="Provider Errors" value={String(data.providerErrorCount)} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

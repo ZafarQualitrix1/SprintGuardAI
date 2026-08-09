@@ -12,8 +12,10 @@ export interface ExecutionRow {
   model: string;
   status: ExecutionStatus;
   latencyMs: number | null;
-  // AgentRun/AiResponse only ever store a combined token count -- no input/output split exists in
-  // the schema, so this is reported as a single honest number rather than fabricating a split.
+  // Sourced from AgentRun.tokensUsed, which only ever stores the combined count -- AiResponse
+  // separately has an inputTokens/outputTokens split (Phase 5 of Prompt Management Optimization),
+  // but this row intentionally keeps surfacing the same single combined number for every run
+  // (including ones that predate the split) rather than a sometimes-present breakdown.
   totalTokens: number | null;
   costUsd: number | null;
   confidenceScore: number | null;
@@ -40,9 +42,21 @@ export interface AnalyticsSummary {
   successRate: number;
   failureRate: number;
   avgLatencyMs: number;
+  // Nearest-rank percentiles over the same latency sample avgLatencyMs is computed from -- a mean
+  // hides exactly the slow-tail behavior (e.g. the deep-requirement-analysis timeout investigation)
+  // that P50/P95 are meant to surface.
+  p50LatencyMs: number;
+  p95LatencyMs: number;
   avgTokens: number;
   avgCostUsd: number;
   avgConfidenceScore: number;
+  // Failure/retry breakdown (Phase 5's AgentRun.retryCount/validationStatus). providerErrorCount
+  // covers every non-validation failure kind Phase 3 classifies (timeout, network, 5xx, 429, auth,
+  // config) as one bucket -- validationStatus intentionally doesn't split those further (see
+  // agent-run.repository.interface.ts), so neither does this.
+  retriedExecutionsCount: number;
+  validationFailureCount: number;
+  providerErrorCount: number;
   byCapability: { capability: string; executions: number; successRate: number; avgLatencyMs: number }[];
   byProvider: { provider: string; executions: number; successRate: number; avgCostUsd: number }[];
   topPerforming: { capability: string; version: string; successRate: number; executions: number }[];

@@ -6,6 +6,7 @@ import {
   ExecutionRow,
   IPromptExecutionReadRepository,
 } from '../../domain/repositories/prompt-execution-read.repository.interface';
+import { percentile } from '../../application/utils/percentile.util';
 
 // Fetch cap for the JS-side capability/search filtering pass below -- DB-level filters
 // (organizationId/provider/model/status/date) already narrow this in the common case; a raw-SQL
@@ -86,9 +87,16 @@ export class PrismaPromptExecutionReadRepository implements IPromptExecutionRead
     const avg = (values: number[]) => (values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0);
 
     const latencies = runs.map((r) => r.aiResponses[0]?.latencyMs).filter((v): v is number => v != null);
+    const sortedLatencies = [...latencies].sort((a, b) => a - b);
     const tokens = runs.map((r) => r.tokensUsed).filter((v): v is number => v != null);
     const costs = runs.map((r) => (r.costUsd ? Number(r.costUsd) : null)).filter((v): v is number => v != null);
     const confidences = runs.map((r) => r.confidenceScore).filter((v): v is number => v != null);
+
+    // Failure/retry breakdown (Phase 5 fields) -- rows created before that migration have both as
+    // null and are simply not counted in either bucket, rather than being misclassified.
+    const retriedExecutionsCount = runs.filter((r) => (r.retryCount ?? 0) >= 1).length;
+    const validationFailureCount = runs.filter((r) => r.validationStatus === 'FAILED_VALIDATION').length;
+    const providerErrorCount = runs.filter((r) => r.validationStatus === 'FAILED_PROVIDER_ERROR').length;
 
     const byCapabilityMap = new Map<string, { executions: number; succeeded: number; latencies: number[] }>();
     const byProviderMap = new Map<string, { executions: number; succeeded: number; costs: number[] }>();
@@ -152,9 +160,14 @@ export class PrismaPromptExecutionReadRepository implements IPromptExecutionRead
       successRate: totalExecutions > 0 ? succeeded / totalExecutions : 0,
       failureRate: totalExecutions > 0 ? failed / totalExecutions : 0,
       avgLatencyMs: avg(latencies),
+      p50LatencyMs: percentile(sortedLatencies, 50),
+      p95LatencyMs: percentile(sortedLatencies, 95),
       avgTokens: avg(tokens),
       avgCostUsd: avg(costs),
       avgConfidenceScore: avg(confidences),
+      retriedExecutionsCount,
+      validationFailureCount,
+      providerErrorCount,
       byCapability,
       byProvider,
       topPerforming: ranked.slice(0, 5),
