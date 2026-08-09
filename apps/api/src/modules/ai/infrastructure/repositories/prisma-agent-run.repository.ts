@@ -37,6 +37,8 @@ export class PrismaAgentRunRepository implements IAgentRunRepository {
         error: input.error,
         provider: input.provider,
         model: input.model,
+        retryCount: input.retryCount,
+        validationStatus: input.validationStatus,
         completedAt: new Date(),
       },
     });

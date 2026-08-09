@@ -21,6 +21,8 @@ export class PrismaAiResponseRepository implements IAiResponseRepository {
         parsedResponse: input.parsedResponse as Prisma.InputJsonValue,
         confidenceScore: input.confidenceScore,
         tokensUsed: input.tokensUsed,
+        inputTokens: input.inputTokens,
+        outputTokens: input.outputTokens,
         latencyMs: input.latencyMs,
         costUsd: input.costUsd,
       },

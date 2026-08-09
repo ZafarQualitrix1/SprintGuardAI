@@ -15,6 +15,7 @@ import {
   AgentCatalogEntry,
   AGENT_RUN_REPOSITORY,
   IAgentRunRepository,
+  ValidationStatus,
   AI_PROMPT_REPOSITORY,
   IAiPromptRepository,
   ActivePrompt,
@@ -117,6 +118,8 @@ interface AttemptOutcome<T> {
   confidenceScore: number;
   rawText: string;
   tokensUsed: number;
+  inputTokens: number;
+  outputTokens: number;
   latencyMs: number;
 }
 
@@ -161,6 +164,17 @@ function extractStatus(error: unknown): number | undefined {
 // wiring at all; the capability/id-keyed caches below are invalidated eagerly on the specific
 // mutations that can make them stale (see invalidatePromptCapabilityCache/invalidatePromptByIdCache).
 const REFERENCE_DATA_CACHE_TTL_MS = 60_000;
+
+// Observability (Phase 5): derives AgentRun.validationStatus from a runAttempts() outcome. Kept as
+// plain functions (not inlined at each of execute()'s 4 completion call sites) since success and
+// fallback-success share one derivation, and the two failure completions share the other.
+function deriveSuccessValidationStatus(attemptsMade: number): ValidationStatus {
+  return attemptsMade <= 1 ? 'PASSED_FIRST_TRY' : 'PASSED_AFTER_REPAIR';
+}
+
+function deriveFailureValidationStatus(lastFailureWasValidation: boolean): ValidationStatus {
+  return lastFailureWasValidation ? 'FAILED_VALIDATION' : 'FAILED_PROVIDER_ERROR';
+}
 
 function classifyAttemptFailure(error: unknown): { kind: AttemptFailureKind; message: string } {
   const message = error instanceof Error ? error.message : String(error);
@@ -312,6 +326,8 @@ export class AiOrchestrationService {
         modelRegistryEntryId,
         provider,
         model,
+        retryCount: primary.attemptsMade - 1,
+        validationStatus: deriveSuccessValidationStatus(primary.attemptsMade),
       });
     }
 
@@ -341,6 +357,8 @@ export class AiOrchestrationService {
           modelRegistryEntryId: undefined,
           provider: effective.fallbackProvider,
           model: effective.fallbackModel,
+          retryCount: fallback.attemptsMade - 1,
+          validationStatus: deriveSuccessValidationStatus(fallback.attemptsMade),
         });
       }
 
@@ -348,6 +366,8 @@ export class AiOrchestrationService {
         id: agentRun.id,
         status: 'FLAGGED_FOR_REVIEW',
         error: `Primary provider failed: ${primary.lastError}; fallback provider failed: ${fallback.lastError}`,
+        retryCount: primary.attemptsMade - 1,
+        validationStatus: deriveFailureValidationStatus(primary.lastFailureWasValidation),
       });
       throw new UnprocessableEntityException(
         `AI agent "${params.agentKey}" failed on both primary and fallback providers: ${fallback.lastError}`,
@@ -358,6 +378,8 @@ export class AiOrchestrationService {
       id: agentRun.id,
       status: 'FLAGGED_FOR_REVIEW',
       error: primary.lastError,
+      retryCount: primary.attemptsMade - 1,
+      validationStatus: deriveFailureValidationStatus(primary.lastFailureWasValidation),
     });
     throw new UnprocessableEntityException(
       `AI agent "${params.agentKey}" output failed validation after retry: ${primary.lastError}`,
@@ -424,9 +446,18 @@ export class AiOrchestrationService {
     renderedPrompt: string;
     outputSchema: ZodType<T, any, any>;
     maxAttempts: number;
-  }): Promise<{ outcome: AttemptOutcome<T> | null; lastError: string }> {
+  }): Promise<{
+    outcome: AttemptOutcome<T> | null;
+    lastError: string;
+    // Observability (Phase 5): total attempts actually made (1-indexed) and whether the LAST one to
+    // fail was a validation-class failure -- execute() uses these to derive retryCount/
+    // validationStatus for the persisted AgentRun, on both the success and failure paths.
+    attemptsMade: number;
+    lastFailureWasValidation: boolean;
+  }> {
     const { providerImpl, model, config, renderedPrompt, outputSchema, maxAttempts } = args;
     let lastError = '';
+    let attemptsMade = 0;
     // Only a schema/JSON-extraction failure means the model actually responded, just not with valid
     // output -- that's the one case a "your previous response was invalid, return corrected JSON"
     // repair prompt is honest and useful. A provider-level failure (timeout/network/5xx/429) means
@@ -435,6 +466,7 @@ export class AiOrchestrationService {
     let lastFailureWasValidation = false;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      attemptsMade = attempt + 1;
       if (attempt > 0 && !lastFailureWasValidation) {
         await delay(TRANSIENT_RETRY_BACKOFF_MS);
       }
@@ -492,9 +524,13 @@ export class AiOrchestrationService {
               confidenceScore: computeConfidence(attempt),
               rawText,
               tokensUsed,
+              inputTokens: completion.inputTokens,
+              outputTokens: completion.outputTokens,
               latencyMs: Date.now() - startedAt,
             },
             lastError: '',
+            attemptsMade,
+            lastFailureWasValidation,
           };
         }
 
@@ -505,7 +541,7 @@ export class AiOrchestrationService {
       lastFailureWasValidation = true;
     }
 
-    return { outcome: null, lastError };
+    return { outcome: null, lastError, attemptsMade, lastFailureWasValidation };
   }
 
   private async persistSuccess<T>(args: {
@@ -515,8 +551,10 @@ export class AiOrchestrationService {
     modelRegistryEntryId: string | undefined;
     provider: string;
     model: string;
+    retryCount: number;
+    validationStatus: ValidationStatus;
   }): Promise<ExecuteAgentResult<T>> {
-    const { outcome, agentRun, prompt, modelRegistryEntryId, provider, model } = args;
+    const { outcome, agentRun, prompt, modelRegistryEntryId, provider, model, retryCount, validationStatus } = args;
     const costUsd = estimateCostUsd(model, outcome.tokensUsed);
 
     await this.responseRepository.create({
@@ -529,6 +567,8 @@ export class AiOrchestrationService {
       parsedResponse: outcome.data as object,
       confidenceScore: outcome.confidenceScore,
       tokensUsed: outcome.tokensUsed,
+      inputTokens: outcome.inputTokens,
+      outputTokens: outcome.outputTokens,
       latencyMs: outcome.latencyMs,
       costUsd,
     });
@@ -541,6 +581,8 @@ export class AiOrchestrationService {
       costUsd,
       provider,
       model,
+      retryCount,
+      validationStatus,
     });
 
     return {

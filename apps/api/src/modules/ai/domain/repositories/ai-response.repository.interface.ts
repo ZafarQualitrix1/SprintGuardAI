@@ -12,6 +12,10 @@ export interface CreateAiResponseInput {
   parsedResponse: unknown;
   confidenceScore: number;
   tokensUsed: number;
+  // Split out of tokensUsed (which stays as the sum) -- the provider response already returns these
+  // separately, previously discarded before persistence.
+  inputTokens?: number;
+  outputTokens?: number;
   latencyMs: number;
   costUsd?: number;
 }

@@ -86,9 +86,18 @@ describe('AiOrchestrationService', () => {
     expect(result.model).toBe('llama-3.3-70b-versatile');
     expect(provider.complete).toHaveBeenCalledTimes(1);
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'run-1', status: 'SUCCEEDED', confidenceScore: 1 }),
+      expect.objectContaining({
+        id: 'run-1',
+        status: 'SUCCEEDED',
+        confidenceScore: 1,
+        retryCount: 0,
+        validationStatus: 'PASSED_FIRST_TRY',
+      }),
     );
     expect(responseRepository.create).toHaveBeenCalledTimes(1);
+    expect(responseRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ inputTokens: 10, outputTokens: 5 }),
+    );
   });
 
   it('repairs once on invalid JSON and returns a discounted confidence score', async () => {
@@ -99,7 +108,7 @@ describe('AiOrchestrationService', () => {
         .mockResolvedValueOnce({ text: 'not valid json at all', inputTokens: 10, outputTokens: 5 })
         .mockResolvedValueOnce({ text: '{"items":["a"]}', inputTokens: 10, outputTokens: 5 }),
     };
-    const { service } = buildService(provider);
+    const { service, agentRunRepository } = buildService(provider);
 
     const result = await service.execute({
       capability: 'test-capability',
@@ -112,6 +121,9 @@ describe('AiOrchestrationService', () => {
     expect(result.data).toEqual({ items: ['a'] });
     expect(result.confidenceScore).toBeCloseTo(0.7);
     expect(provider.complete).toHaveBeenCalledTimes(2);
+    expect(agentRunRepository.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ retryCount: 1, validationStatus: 'PASSED_AFTER_REPAIR' }),
+    );
     // The repair prompt includes the prior error so the model can self-correct.
     expect(provider.complete.mock.calls[1][0].prompt).toContain('Your previous response was invalid');
   });
@@ -134,7 +146,29 @@ describe('AiOrchestrationService', () => {
     ).rejects.toThrow(/failed validation after retry/);
 
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
-      expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW' }),
+      expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW', retryCount: 1, validationStatus: 'FAILED_VALIDATION' }),
+    );
+  });
+
+  it('records FAILED_PROVIDER_ERROR (not FAILED_VALIDATION) when every attempt fails at the provider level', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockRejectedValue(new Error('socket hang up')),
+    };
+    const { service, agentRunRepository } = buildService(provider);
+
+    await expect(
+      service.execute({
+        capability: 'test-capability',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: {},
+        outputSchema,
+      }),
+    ).rejects.toThrow(/failed validation after retry/);
+
+    expect(agentRunRepository.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW', retryCount: 1, validationStatus: 'FAILED_PROVIDER_ERROR' }),
     );
   });
 

@@ -11,6 +11,11 @@ export interface StartAgentRunInput {
   model: string;
 }
 
+// Matches AgentRun.validationStatus's documented values in schema.prisma -- kept as a free-form
+// column there (not a DB enum) so a new value here never needs a migration, but the write side is
+// still typed against this union.
+export type ValidationStatus = 'PASSED_FIRST_TRY' | 'PASSED_AFTER_REPAIR' | 'FAILED_VALIDATION' | 'FAILED_PROVIDER_ERROR';
+
 export interface CompleteAgentRunInput {
   id: string;
   status: Extract<AgentRunStatus, 'SUCCEEDED' | 'FAILED' | 'FLAGGED_FOR_REVIEW'>;
@@ -23,6 +28,10 @@ export interface CompleteAgentRunInput {
   // provider/model reflects reality rather than the primary provider chosen at start().
   provider?: string;
   model?: string;
+  // Observability (Prompt Management Optimization Phase 5) -- attempts consumed beyond the first,
+  // and a structured classification of the final outcome distinct from the free-text `error` above.
+  retryCount?: number;
+  validationStatus?: ValidationStatus;
 }
 
 export interface IAgentRunRepository {
