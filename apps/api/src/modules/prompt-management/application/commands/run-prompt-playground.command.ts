@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { z } from 'zod';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { AGENT_REPOSITORY, IAgentRepository } from '../../../ai/domain/repositories';
 import { PROMPT_REPOSITORY, IPromptRepository } from '../../domain/repositories/prompt.repository.interface';
 
@@ -54,13 +54,18 @@ export class RunPromptPlaygroundHandler implements ICommandHandler<RunPromptPlay
 
     const startedAt = Date.now();
     try {
+      // No explicit override chosen -- fall back to the same provider pin the capability's real
+      // production command uses (if any), so a Playground test without an override reflects what
+      // actually happens in production instead of silently falling through to a possibly-broken
+      // org-level default the production call site was deliberately pinned to avoid.
+      const provider = command.providerOverride ?? CAPABILITY_PROVIDER_PINS[prompt.capability];
       const result = await this.aiOrchestrationService.execute({
         capability: prompt.capability,
         agentKey: agent.key,
         organizationId: command.organizationId,
         variables: command.variables,
         outputSchema: permissiveOutputSchema,
-        provider: command.providerOverride,
+        provider,
         correlationId: `playground-${randomUUID()}`,
         promptOverride: prompt.id,
       });

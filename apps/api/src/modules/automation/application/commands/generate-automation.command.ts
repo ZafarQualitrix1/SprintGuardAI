@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   AUTOMATION_GENERATION_REPOSITORY,
@@ -72,7 +72,7 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
         capability: 'playwright-api-automation',
         agentKey: 'playwright-api-automation-agent',
         organizationId: command.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['playwright-api-automation'],
         variables: {
           storyTitle: testCase.storyTitle,
           testCaseTitle: testCase.title,
@@ -116,7 +116,7 @@ export class GenerateAutomationHandler implements ICommandHandler<GenerateAutoma
       capability: 'playwright-ui-automation',
       agentKey: 'playwright-ui-automation-agent',
       organizationId: command.organizationId,
-      provider: 'groq',
+      provider: CAPABILITY_PROVIDER_PINS['playwright-ui-automation'],
       variables: {
         storyTitle: testCase.storyTitle,
         testCaseTitle: testCase.title,

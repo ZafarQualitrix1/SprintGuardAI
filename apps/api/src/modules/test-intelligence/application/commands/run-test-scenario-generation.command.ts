@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   ACCEPTANCE_CRITERION_READ_REPOSITORY,
@@ -90,7 +90,7 @@ export class RunTestScenarioGenerationHandler
         capability: 'test-scenario',
         agentKey: 'test-scenario-agent',
         organizationId: command.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['test-scenario'],
         variables: { storyTitle: ac.storyTitle, given: ac.given, when: ac.when, then: ac.then },
         outputSchema: testScenarioOutputSchema,
         // Stable per-acceptance-criterion key: rejects a second concurrent generation for the same

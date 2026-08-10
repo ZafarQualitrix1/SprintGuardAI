@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import {
   STORY_BA_REVIEW_STATE_REPOSITORY,
   IStoryBaReviewStateRepository,
@@ -91,7 +91,7 @@ export class GetSubmissionDraftHandler implements IQueryHandler<GetSubmissionDra
         capability: 'ba-review-submission-summary',
         agentKey: 'ba-review-submission-summary-agent',
         organizationId: query.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['ba-review-submission-summary'],
         variables: {
           storyTitle: draftInput.storyTitle,
           documentVersionLabel: draftInput.documentVersionLabel,

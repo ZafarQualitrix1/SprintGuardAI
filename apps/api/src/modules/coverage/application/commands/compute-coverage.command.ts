@@ -1,6 +1,6 @@
 import { Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, EventBus, ICommandHandler } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import {
   COVERAGE_SOURCE_READ_REPOSITORY,
   ICoverageSourceReadRepository,
@@ -60,7 +60,7 @@ export class ComputeCoverageHandler implements ICommandHandler<ComputeCoverageCo
         capability: 'coverage-recommendation',
         agentKey: 'coverage-agent',
         organizationId: command.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['coverage-recommendation'],
         variables: {
           sprintName: source.sprintName,
           coveragePercent: summary.coveragePercent,

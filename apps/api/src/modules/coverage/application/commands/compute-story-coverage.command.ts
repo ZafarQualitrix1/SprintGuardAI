@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   COVERAGE_SOURCE_READ_REPOSITORY,
@@ -71,7 +71,7 @@ export class ComputeStoryCoverageHandler
         // Explicit: capabilities without a provider fall through to the deployment's
         // AI_DEFAULT_PROVIDER env var, which has drifted to an unconfigured provider in Vercel
         // before -- pinning to the one with a real, working key avoids depending on that.
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['coverage-recommendation'],
         variables: {
           sprintName: `Story: ${source.storyTitle}`,
           coveragePercent: summary.coveragePercent,

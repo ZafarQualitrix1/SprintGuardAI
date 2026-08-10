@@ -1,6 +1,6 @@
 import { ForbiddenException, Inject, NotFoundException } from '@nestjs/common';
 import { CommandHandler, EventBus, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import {
   REQUIREMENT_REPOSITORY,
@@ -56,7 +56,7 @@ export class RunRequirementIntelligenceAgentHandler
       // org-level AiProviderConfig/ModuleAiConfig override anywhere, so leaving it unset falls
       // through to the environment's global AI_DEFAULT_PROVIDER -- which is Anthropic with no
       // configured key, not the Groq key this project actually has.
-      provider: 'groq',
+      provider: CAPABILITY_PROVIDER_PINS['requirement-intelligence'],
       variables: { storyTitle: story.title, storyDescription: story.description ?? 'No description provided.' },
       outputSchema: requirementIntelligenceOutputSchema,
       // Stable per-story key: this command is fired both directly and fire-and-forget from

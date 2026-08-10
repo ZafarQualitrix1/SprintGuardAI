@@ -84,6 +84,26 @@ function clampTimeout(capability: string, configuredTimeoutMs: number | undefine
   return Math.max(configuredTimeoutMs, floor);
 }
 
+// A capability with no org-level AiProviderConfig/ModuleAiConfig override falls through to
+// AI_DEFAULT_PROVIDER, which has drifted to an unconfigured provider (Anthropic, no working key) in
+// this deployment before. Every production command handler that needs a working AI call pins its
+// provider explicitly instead of depending on that default -- centralized here, as the single place
+// both those handlers AND Prompt Playground (run-prompt-playground.command.ts, when no explicit
+// override is chosen) read from, so the two can never drift apart the way they did before this map
+// existed (Playground silently used the broken default while production used a working pin).
+export const CAPABILITY_PROVIDER_PINS: Record<string, string> = {
+  'deep-requirement-analysis': 'groq',
+  'requirement-intelligence': 'groq',
+  'test-scenario': 'groq',
+  'test-case': 'groq',
+  'test-case-improvement': 'groq',
+  'playwright-api-automation': 'groq',
+  'playwright-ui-automation': 'groq',
+  'ba-review-submission-summary': 'groq',
+  'coverage-recommendation': 'groq',
+  'release-readiness-summary': 'groq',
+};
+
 export interface ExecuteAgentParams<T> {
   capability: string;
   agentKey: string;

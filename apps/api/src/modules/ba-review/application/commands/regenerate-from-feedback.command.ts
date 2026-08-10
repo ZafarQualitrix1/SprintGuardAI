@@ -1,6 +1,6 @@
 import { Inject, Logger, NotFoundException } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { AuditLogService } from '../../../integration/infrastructure/services/audit-log.service';
 import { MarkAutomationOutdatedCommand } from '../../../automation/application/commands/mark-automation-outdated.command';
 import {
@@ -99,7 +99,7 @@ export class RegenerateFromFeedbackHandler implements ICommandHandler<Regenerate
           previousVersionLabel: previousCycle.documentVersionLabel,
         },
         outputSchema: testCaseImprovementOutputSchema,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['test-case-improvement'],
         // Stable per-story key: rejects a second concurrent feedback-driven regeneration for the
         // same story (e.g. a duplicated BA-reply webhook/poll) instead of racing this call's
         // applyChangeset() write and the state machine's REGENERATION_IN_PROGRESS transition above.

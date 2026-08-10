@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { FetchExternalIssueDetailQuery } from '../../../integration/application/queries/fetch-external-issue-detail.query';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import { ExternalIssueDetailPayload } from '../../../integration/application/ports/integration-connector.port';
@@ -82,7 +82,7 @@ export class RunDeepRequirementAnalysisHandler
       organizationId: command.organizationId,
       variables: { storyContext },
       outputSchema: deepRequirementAnalysisOutputSchema,
-      provider: 'groq',
+      provider: CAPABILITY_PROVIDER_PINS['deep-requirement-analysis'],
       // Stable per-story key: a second "Analyze" click (or a retried request) while this story's
       // analysis is still running gets rejected with a clear 409 instead of racing this call and
       // doubling load on top of the fire-and-forget requirement-intelligence call already in flight.

@@ -1,6 +1,6 @@
 import { Inject, NotFoundException } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { ComputeCoverageCommand } from '../../../coverage/application/commands/compute-coverage.command';
 import {
   RELEASE_METRICS_READ_REPOSITORY,
@@ -88,7 +88,7 @@ export class ComputeReleaseReadinessHandler
         capability: 'release-readiness-summary',
         agentKey: 'release-guardian-agent',
         organizationId: command.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['release-readiness-summary'],
         variables: {
           readinessScore,
           releaseStatus: breakdown.releaseStatus,

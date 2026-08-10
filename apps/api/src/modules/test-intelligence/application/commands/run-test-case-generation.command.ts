@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Logger } from '@nestjs/common';
 import { CommandBus, CommandHandler, ICommandHandler, QueryBus } from '@nestjs/cqrs';
-import { AiOrchestrationService } from '../../../ai/application/services/ai-orchestration.service';
+import { AiOrchestrationService, CAPABILITY_PROVIDER_PINS } from '../../../ai/application/services/ai-orchestration.service';
 import { IsStoryLockedQuery } from '../../../ba-review/application/queries/is-story-locked.query';
 import { TriggerBaReviewCommand } from '../../../ba-review/application/commands/trigger-ba-review.command';
 import { TestCaseSnapshotEntry } from '../../../ba-review/domain/entities/ba-review-cycle.entity';
@@ -68,7 +68,7 @@ export class RunTestCaseGenerationHandler implements ICommandHandler<RunTestCase
         capability: 'test-case',
         agentKey: 'test-case-agent',
         organizationId: command.organizationId,
-        provider: 'groq',
+        provider: CAPABILITY_PROVIDER_PINS['test-case'],
         variables: {
           scenarioTitle: scenario.title,
           scenarioDescription: scenario.description ?? 'No additional description.',
