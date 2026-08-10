@@ -143,7 +143,7 @@ describe('AiOrchestrationService', () => {
         variables: {},
         outputSchema,
       }),
-    ).rejects.toThrow(/failed validation after retry/);
+    ).rejects.toThrow(/couldn't produce a valid result/);
 
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW', retryCount: 1, validationStatus: 'FAILED_VALIDATION' }),
@@ -165,10 +165,37 @@ describe('AiOrchestrationService', () => {
         variables: {},
         outputSchema,
       }),
-    ).rejects.toThrow(/failed validation after retry/);
+    ).rejects.toThrow(/taking longer than expected/);
 
     expect(agentRunRepository.complete).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'FLAGGED_FOR_REVIEW', retryCount: 1, validationStatus: 'FAILED_PROVIDER_ERROR' }),
+    );
+  });
+
+  it('translates a known capability into a friendly, non-technical message that still includes the execution id', async () => {
+    const provider: jest.Mocked<IAiProvider> = {
+      key: 'groq',
+      complete: jest.fn().mockRejectedValue(new Error('AI provider call timed out after 90000ms')),
+    };
+    const { service, agentRunRepository } = buildService(provider);
+    agentRunRepository.start.mockResolvedValue({ id: 'run-friendly-1' });
+
+    await expect(
+      service.execute({
+        capability: 'deep-requirement-analysis',
+        agentKey: 'test-agent',
+        organizationId: 'org-1',
+        variables: {},
+        outputSchema,
+      }),
+    ).rejects.toThrow(
+      /^Requirement analysis is taking longer than expected.*Execution ID: run-friendly-1/,
+    );
+
+    // The raw technical detail must still reach AgentRun.error (and the server log) even though the
+    // thrown exception's message -- what the frontend surfaces in a toast -- no longer contains it.
+    expect(agentRunRepository.complete).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringContaining('timed out after 90000ms') }),
     );
   });
 
@@ -214,7 +241,7 @@ describe('AiOrchestrationService', () => {
         variables: {},
         outputSchema,
       }),
-    ).rejects.toThrow(/failed validation after retry/);
+    ).rejects.toThrow(/taking longer than expected/);
 
     // DEFAULT_MAX_ATTEMPTS is 2, but an auth failure can never succeed by retrying with the same
     // credentials -- confirms the loop stopped after the first attempt instead of burning a second
@@ -325,7 +352,7 @@ describe('AiOrchestrationService', () => {
       resultPromise.catch(() => {}); // avoid an unhandled-rejection warning before the assertion below
 
       await jest.advanceTimersByTimeAsync(5000);
-      await expect(resultPromise).rejects.toThrow(/failed validation after retry/);
+      await expect(resultPromise).rejects.toThrow(/taking longer than expected/);
     } finally {
       jest.useRealTimers();
     }

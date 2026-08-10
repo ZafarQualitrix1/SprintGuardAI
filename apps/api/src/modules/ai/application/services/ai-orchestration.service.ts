@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -176,6 +177,39 @@ function deriveFailureValidationStatus(lastFailureWasValidation: boolean): Valid
   return lastFailureWasValidation ? 'FAILED_VALIDATION' : 'FAILED_PROVIDER_ERROR';
 }
 
+// User-facing error translation (Phase 7): a raw technical message like "AI provider call timed out
+// after 90000ms" or a Zod issue list means nothing to the person who clicked "Analyze" -- it belongs
+// in AgentRun.error and the server log (both still capture it verbatim, see the throw sites below),
+// not in the HTTP response body. Deliberately capability-aware rather than a blanket generic string,
+// so the message still says what the user was actually trying to do.
+const CAPABILITY_DISPLAY_NAMES: Record<string, string> = {
+  'deep-requirement-analysis': 'Requirement analysis',
+  'requirement-intelligence': 'Requirement analysis',
+  'test-scenario': 'Test scenario generation',
+  'test-case': 'Test case generation',
+  'test-case-improvement': 'Test case regeneration',
+  'ba-review-submission-summary': 'BA review summary generation',
+  'playwright-api-automation': 'API automation code generation',
+  'playwright-ui-automation': 'UI automation code generation',
+};
+
+function friendlyCapabilityName(capability: string): string {
+  return CAPABILITY_DISPLAY_NAMES[capability] ?? 'This operation';
+}
+
+function buildUserFacingFailureMessage(
+  capability: string,
+  validationStatus: ValidationStatus,
+  agentRunId: string,
+): string {
+  const label = friendlyCapabilityName(capability);
+  const detail =
+    validationStatus === 'FAILED_PROVIDER_ERROR'
+      ? 'is taking longer than expected, or the AI provider is temporarily unavailable'
+      : "couldn't produce a valid result after multiple attempts";
+  return `${label} ${detail}. Please try again in a moment. (Execution ID: ${agentRunId} -- include this if you contact support.)`;
+}
+
 function classifyAttemptFailure(error: unknown): { kind: AttemptFailureKind; message: string } {
   const message = error instanceof Error ? error.message : String(error);
 
@@ -210,6 +244,7 @@ export class AiOrchestrationService {
   private readonly promptByIdCache = new InProcessTtlCache<ActivePrompt | null>(REFERENCE_DATA_CACHE_TTL_MS);
   private readonly agentByKeyCache = new InProcessTtlCache<AgentCatalogEntry | null>(REFERENCE_DATA_CACHE_TTL_MS);
   private readonly modelRegistryCache = new InProcessTtlCache<ModelRegistryEntry | null>(REFERENCE_DATA_CACHE_TTL_MS);
+  private readonly logger = new Logger(AiOrchestrationService.name);
 
   constructor(
     @Inject(AI_PROVIDERS) private readonly providers: IAiProvider[],
@@ -362,27 +397,34 @@ export class AiOrchestrationService {
         });
       }
 
+      const bothFailedValidationStatus = deriveFailureValidationStatus(primary.lastFailureWasValidation);
       await this.agentRunRepository.complete({
         id: agentRun.id,
         status: 'FLAGGED_FOR_REVIEW',
         error: `Primary provider failed: ${primary.lastError}; fallback provider failed: ${fallback.lastError}`,
         retryCount: primary.attemptsMade - 1,
-        validationStatus: deriveFailureValidationStatus(primary.lastFailureWasValidation),
+        validationStatus: bothFailedValidationStatus,
       });
+      this.logger.error(
+        `AgentRun ${agentRun.id} (${params.capability}) failed on both primary and fallback providers -- ` +
+          `primary: ${primary.lastError}; fallback: ${fallback.lastError}`,
+      );
       throw new UnprocessableEntityException(
-        `AI agent "${params.agentKey}" failed on both primary and fallback providers: ${fallback.lastError}`,
+        buildUserFacingFailureMessage(params.capability, bothFailedValidationStatus, agentRun.id),
       );
     }
 
+    const failureValidationStatus = deriveFailureValidationStatus(primary.lastFailureWasValidation);
     await this.agentRunRepository.complete({
       id: agentRun.id,
       status: 'FLAGGED_FOR_REVIEW',
       error: primary.lastError,
       retryCount: primary.attemptsMade - 1,
-      validationStatus: deriveFailureValidationStatus(primary.lastFailureWasValidation),
+      validationStatus: failureValidationStatus,
     });
+    this.logger.error(`AgentRun ${agentRun.id} (${params.capability}) failed after retry: ${primary.lastError}`);
     throw new UnprocessableEntityException(
-      `AI agent "${params.agentKey}" output failed validation after retry: ${primary.lastError}`,
+      buildUserFacingFailureMessage(params.capability, failureValidationStatus, agentRun.id),
     );
   }
 
